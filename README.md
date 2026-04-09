@@ -7,7 +7,41 @@
 |:-:|
 |Yoonsung Jung<br/>[@coouir](https://github.com/coouir)|
 
-## 🛠️ 기술 스택 (Tech Stack)
+---
+
+## 🤖 AI Tech Stack
+
+### 🧩 Core Features
+
+#### 1. Image → Title & Draft Generation
+- Model: Gemma 4 E2B (GGUF)
+- Description: Generate Korean blog-style title and draft (2–3 lines) from input images
+
+#### 2. Image-Text Similarity Verification
+- Model: CLIP
+- Description: Validate consistency between generated title and image using cosine similarity
+
+#### 3. Image Auto Editing
+- Model: YOLOv8
+- Description:
+  - Object detection
+  - Main object extraction (cropping)
+  - Image alignment / rotation correction
+
+---
+
+### ⚙️ Framework & Libraries
+- PyTorch
+- HuggingFace Transformers
+- llama-cpp-python (GGUF inference)
+- OpenCV
+- NumPy
+
+---
+
+### 🚀 Serving
+- FastAPI (AI inference API)
+- AWS EC2 / SageMaker
 
 ### 🌐 Git-flow 전략 (Git-flow Strategy)
 
