@@ -2,12 +2,10 @@
 
 > 한국항공대 산학 프로젝트 LighTrip AI 레포지토리입니다.
 
-## Team Members
-|<img src="https://avatars.githubusercontent.com/u/81412484?v=4" width="150" height="150"/>|<img src="https://github.com/jaehyeon4406.png" width="150" height="150"/>|
-|:-:|:-:|
+## 👨‍💻 Developer
+|<img src="https://avatars.githubusercontent.com/u/166575866?v=4" width="150" height="150"/>|
+|:-:|
 |Yoonsung Jung<br/>[@coouir](https://github.com/coouir)|
-<br>
-<br>
 
 ## 🛠️ 기술 스택 (Tech Stack)
 
