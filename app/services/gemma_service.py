@@ -1,9 +1,8 @@
 import base64
 import mimetypes
 import re
-import time
 from pathlib import Path
-from typing import Final
+from typing import Final, Optional
 
 import llama_cpp
 from llama_cpp import Llama
@@ -16,19 +15,39 @@ MODEL_DIR: Final[Path] = PROJECT_ROOT / "models"
 
 MODEL_PATH: Final[str] = str(MODEL_DIR / "gemma-4-E2B-it-Q4_K_M.gguf")
 MMPROJ_PATH: Final[str] = str(MODEL_DIR / "mmproj-F16.gguf")
-IMAGE_PATH: Final[str] = str(BASE_DIR / "images" / "running.jpg")
 
 N_CTX: Final[int] = 1024
-MAX_TOKENS: Final[int] = 64
+MAX_TOKENS: Final[int] = 128
 TEMPERATURE: Final[float] = 1.0
 TOP_P: Final[float] = 0.95
 TOP_K: Final[int] = 64
 REPEAT_PENALTY: Final[float] = 1.2
 STOP_TOKENS: Final[list[str]] = ["<end_of_turn>"]
 
+ALLOWED_IMAGE_TYPES: Final[set[str]] = {
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+}
+
+_llm: Optional[Llama] = None
+
+
+def get_llm() -> Optional[Llama]:
+    return _llm
+
+
+def is_model_loaded() -> bool:
+    return _llm is not None
+
+
+def unload_model() -> None:
+    global _llm
+    _llm = None
+
 
 def dedupe_sentences(text: str) -> str:
-    """중복 문장을 제거하고 줄바꿈 기준으로 정리한다."""
     parts = re.split(r"(?<=[.!?。！？])\s+|\n+", text.strip())
     seen: set[str] = set()
     kept: list[str] = []
@@ -42,20 +61,14 @@ def dedupe_sentences(text: str) -> str:
     return "\n".join(kept)
 
 
-def image_to_data_uri(image_path: str) -> str:
-    """로컬 이미지를 data URI로 변환한다."""
-    path = Path(image_path)
-    if not path.exists():
-        raise FileNotFoundError(f"이미지 파일을 찾을 수 없습니다: {image_path}")
-
-    mime_type = mimetypes.guess_type(path.name)[0] or "image/jpeg"
-    encoded = base64.b64encode(path.read_bytes()).decode("utf-8")
+def image_bytes_to_data_uri(image_bytes: bytes, filename: str = "upload.jpg") -> str:
+    mime_type = mimetypes.guess_type(filename)[0] or "image/jpeg"
+    encoded = base64.b64encode(image_bytes).decode("utf-8")
     return f"data:{mime_type};base64,{encoded}"
 
 
-def build_prompt() -> str:
-    """블로그 초안 생성을 위한 사용자 프롬프트를 반환한다."""
-    return (
+def build_prompt(user_prompt: str | None = None) -> str:
+    base_prompt = (
         "너는 사용자가 사진과 함께 올릴 짧은 블로그 글 초안을 대신 작성하는 한국어 작가다.\n"
         "중요: 이미지 내용을 설명하는 해설문을 쓰지 마라.\n"
         "중요: 사용자가 자신의 순간을 기록하듯 자연스럽게 써라.\n"
@@ -63,9 +76,14 @@ def build_prompt() -> str:
         "반드시 한국어로만 작성하고, 정확히 2줄만 출력해라.\n"
         "각 줄은 실제 블로그나 SNS에 올릴 법한 자연스러운 초안이어야 한다.\n"
         "너무 분석적이거나 객관적인 묘사는 피하고, 일상 기록처럼 부드럽게 작성해라.\n"
-        "제목, 번호, 기호, 따옴표 없이 결과만 출력해라.\n\n"
-        "이 사진을 바탕으로 사용자가 직접 작성한 것 같은 블로그 초안 2줄을 작성해줘."
+        "제목, 번호, 기호, 따옴표 없이 결과만 출력해라.\n"
     )
+
+    if user_prompt and user_prompt.strip():
+        base_prompt += f"\n사용자 요청:\n{user_prompt.strip()}\n"
+
+    base_prompt += "\n이 사진을 바탕으로 사용자가 직접 작성한 것 같은 블로그 초안 2줄을 작성해줘."
+    return base_prompt
 
 
 class Gemma4VisionChatHandler(Llava15ChatHandler):
@@ -101,7 +119,6 @@ class Gemma4VisionChatHandler(Llava15ChatHandler):
     )
 
     def _init_mtmd_context(self, llama_model) -> None:
-        """멀티모달 컨텍스트를 초기화한다."""
         if self.mtmd_ctx is not None:
             return
 
@@ -119,16 +136,13 @@ class Gemma4VisionChatHandler(Llava15ChatHandler):
             )
 
             if self.mtmd_ctx is None:
-                raise ValueError(
-                    f"Failed to load mtmd context from: {self.clip_model_path}"
-                )
+                raise ValueError(f"Failed to load mtmd context from: {self.clip_model_path}")
 
             if not self._mtmd_cpp.mtmd_support_vision(self.mtmd_ctx):
                 raise ValueError("Vision is not supported by this model")
 
 
 def create_chat_handler(mmproj_path: str, verbose: bool = True) -> Gemma4VisionChatHandler:
-    """비전 채팅 핸들러를 생성한다."""
     mmproj_file = Path(mmproj_path)
     if not mmproj_file.exists():
         raise FileNotFoundError(f"mmproj 파일을 찾을 수 없습니다: {mmproj_path}")
@@ -144,7 +158,6 @@ def create_llm(
     chat_handler: Gemma4VisionChatHandler,
     verbose: bool = True,
 ) -> Llama:
-    """Llama 모델 인스턴스를 생성한다."""
     model_file = Path(model_path)
     if not model_file.exists():
         raise FileNotFoundError(f"모델 파일을 찾을 수 없습니다: {model_path}")
@@ -160,10 +173,24 @@ def create_llm(
     )
 
 
-def generate_blog_draft(llm: Llama, image_path: str) -> str:
-    """이미지를 기반으로 블로그 초안 2줄을 생성한다."""
-    image_data_uri = image_to_data_uri(image_path)
-    prompt_text = build_prompt()
+def load_model(verbose: bool = True) -> None:
+    global _llm
+
+    if _llm is not None:
+        return
+
+    chat_handler = create_chat_handler(MMPROJ_PATH, verbose=verbose)
+    _llm = create_llm(MODEL_PATH, chat_handler, verbose=verbose)
+
+
+def generate_blog_draft_from_bytes(
+    llm: Llama,
+    image_bytes: bytes,
+    filename: str,
+    user_prompt: str | None = None,
+) -> str:
+    image_data_uri = image_bytes_to_data_uri(image_bytes, filename)
+    prompt_text = build_prompt(user_prompt)
 
     response = llm.create_chat_completion(
         messages=[
@@ -191,23 +218,3 @@ def generate_blog_draft(llm: Llama, image_path: str) -> str:
 
     content = response["choices"][0]["message"]["content"].strip()
     return dedupe_sentences(content)
-
-
-def main() -> None:
-    try:
-        chat_handler = create_chat_handler(MMPROJ_PATH, verbose=True)
-        llm = create_llm(MODEL_PATH, chat_handler, verbose=True)
-
-        start_time = time.perf_counter()
-        draft = generate_blog_draft(llm, IMAGE_PATH)
-        elapsed = time.perf_counter() - start_time
-
-        print(draft)
-        print(f"\n총 추론 시간: {elapsed:.2f}초")
-
-    except Exception as exc:
-        print(f"오류가 발생했습니다: {exc}")
-
-
-if __name__ == "__main__":
-    main()
