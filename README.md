@@ -1,6 +1,5 @@
 # [KAU] LighTrip AI Repository
-
-> 한국항공대 산학 프로젝트 LighTrip AI 레포지토리입니다.
+> 한국항공대학교 산학 프로젝트 **LighTrip AI** 레포지토리입니다.
 
 ## 👨‍💻 Developer
 |<img src="https://avatars.githubusercontent.com/u/166575866?v=4" width="150" height="150"/>|
@@ -13,35 +12,28 @@
 
 ### 🧩 Core Features
 
-#### 1. Image → Title & Draft Generation
+#### 1. Image → Draft Generation
 - Model: Gemma 4 E2B (GGUF)
-- Description: Generate Korean blog-style title and draft (2–3 lines) from input images
+- Description:  
+  사용자 이미지와 프롬프트를 기반으로 한국어 블로그 스타일 초안(2–3줄) 생성
 
-#### 2. Image-Text Similarity Verification
-- Model: CLIP
-- Description: Validate consistency between generated title and image using cosine similarity
-
-#### 3. Image Auto Editing
-- Model: YOLOv8
-- Description:
-  - Object detection
-  - Main object extraction (cropping)
-  - Image alignment / rotation correction
-
----
+#### 2. Category Classification
+- Model: TF-IDF + Naive Bayes (Baseline)  
+- Description:  
+  Gemma4 모델이 생성한 초안을 입력으로 받아  
+  카테고리(카페, 식당, 술집, 공원, 운동 등) 자동 분류
 
 ### ⚙️ Framework & Libraries
-- PyTorch
-- HuggingFace Transformers
-- llama-cpp-python (GGUF inference)
-- OpenCV
-- NumPy
-
----
+- PyTorch  
+- HuggingFace Transformers  
+- llama-cpp-python (GGUF inference)  
+- scikit-learn 
+- NumPy  
 
 ### 🚀 Serving
 - FastAPI (AI inference API)
-- AWS EC2 / SageMaker
+
+---
 
 ### 🌐 Git-flow 전략 (Git-flow Strategy)
 

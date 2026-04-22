@@ -1,0 +1,18 @@
+# 🔥 모델 파일 (절대 올리면 안 됨)
+*.gguf
+models/
+
+# 🔥 이미지 (실험용)
+experiments/**/images/
+
+# 🔥 로그 / 결과 파일
+*.log
+*.txt
+outputs/
+
+# 🔥 Python
+__pycache__/
+*.pyc
+
+# 🔥 환경파일
+.env
