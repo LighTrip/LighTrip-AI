@@ -20,8 +20,64 @@
 #### 2. Category Classification
 - Model: TF-IDF + Naive Bayes (Baseline)  
 - Description:  
-  Gemma4 모델이 생성한 초안을 입력으로 받아  
-  카테고리(카페, 식당, 술집, 공원, 운동 등) 자동 분류
+  본 PR에서 구축한 데이터셋을 기반으로 추후 텍스트 분류 모델 학습
+
+#### 3. Image Draft Dataset Pipeline
+- Goal: 이미지 기반 블로그 초안 생성 데이터를 카테고리 분류 학습용 JSONL/CSV로 구축
+- Dataset labels: 카페, 식당, 술집, 문화, 운동, 쇼핑, 공원
+- Future inference labels: 카페, 식당, 술집, 문화, 운동, 쇼핑, 공원, 기타
+- Recommended target: 클래스당 180개 이상, 총 1,000개 이상
+
+```bash
+# 0) 데이터셋 구축 도구 설치
+pip install -r requirements-dataset.txt
+
+# 1) Open Images V7 일부 수집 (fiftyone 필요)
+python scripts/dataset/collect_open_images.py --max-samples-per-category 180
+
+# 2) 로컬 이미지 폴더에서 Gemma4 초안 생성
+python scripts/dataset/generate_drafts.py --limit-per-category 150
+
+# 3) 생성 초안 품질 검증
+python scripts/dataset/validate_drafts.py
+
+# 4) train/valid/test 분할 및 CSV 변환
+python scripts/dataset/split_dataset.py --csv
+```
+
+데이터 폴더 구조:
+
+```text
+data/images/cafe/
+data/images/restaurant/
+data/images/bar/
+data/images/culture/
+data/images/exercise/
+data/images/shopping/
+data/images/park/
+```
+
+데이터셋 생성 시에는 카테고리 분류 학습 품질을 높이기 위해 각 라벨의 약한 힌트를 Gemma4 프롬프트에 자동으로 추가합니다. 서비스 API의 기본 프롬프트는 그대로 유지됩니다.
+
+데이터셋 생성 스크립트는 10GB GPU에서도 안정적으로 돌도록 기본 저VRAM 모드를 사용합니다.
+
+- CUDA graph 비활성화
+- `gemma-4-E2B-it-Q4_K_S.gguf` 사용
+- `n_ctx=768`, `max_tokens=64`
+- GPU 레이어 일부만 사용
+
+```bash
+# 더 보수적으로 돌릴 때
+python scripts/dataset/generate_drafts.py --limit-per-category 150 --gpu-layers 16
+
+# VRAM 여유가 충분해서 기존처럼 GPU를 적극 활용하고 싶을 때
+python scripts/dataset/generate_drafts.py --limit-per-category 150 --full-gpu
+```
+
+```bash
+# 카테고리 힌트 없이 기본 프롬프트만 사용하고 싶을 때
+python scripts/dataset/generate_drafts.py --limit-per-category 150 --no-category-hint
+```
 
 ### ⚙️ Framework & Libraries
 - PyTorch  

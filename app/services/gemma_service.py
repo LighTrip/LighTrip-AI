@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import base64
 import mimetypes
+import os
 import re
 from pathlib import Path
 from typing import Final, Optional
@@ -13,16 +16,22 @@ BASE_DIR: Final[Path] = Path(__file__).resolve().parent
 PROJECT_ROOT: Final[Path] = BASE_DIR.parent.parent
 MODEL_DIR: Final[Path] = PROJECT_ROOT / "models"
 
-MODEL_PATH: Final[str] = str(MODEL_DIR / "gemma-4-E2B-it-Q4_K_M.gguf")
-MMPROJ_PATH: Final[str] = str(MODEL_DIR / "mmproj-F16.gguf")
+MODEL_FILENAME: Final[str] = os.getenv("GEMMA_MODEL_FILENAME", "gemma-4-E2B-it-Q4_K_M.gguf")
+MMPROJ_FILENAME: Final[str] = os.getenv("GEMMA_MMPROJ_FILENAME", "mmproj-F16.gguf")
+MODEL_PATH: Final[str] = str(MODEL_DIR / MODEL_FILENAME)
+MMPROJ_PATH: Final[str] = str(MODEL_DIR / MMPROJ_FILENAME)
 
-N_CTX: Final[int] = 1024
-MAX_TOKENS: Final[int] = 128
+N_CTX: Final[int] = int(os.getenv("GEMMA_N_CTX", "1024"))
+MAX_TOKENS: Final[int] = int(os.getenv("GEMMA_MAX_TOKENS", "128"))
 TEMPERATURE: Final[float] = 1.0
 TOP_P: Final[float] = 0.95
 TOP_K: Final[int] = 64
 REPEAT_PENALTY: Final[float] = 1.2
 STOP_TOKENS: Final[list[str]] = ["<end_of_turn>"]
+N_GPU_LAYERS: Final[int] = int(os.getenv("GEMMA_N_GPU_LAYERS", "-1"))
+MAIN_GPU: Final[int] = int(os.getenv("GEMMA_MAIN_GPU", "0"))
+OFFLOAD_KQV: Final[bool] = os.getenv("GEMMA_OFFLOAD_KQV", "1") != "0"
+MMPROJ_USE_GPU: Final[bool] = os.getenv("GEMMA_MMPROJ_USE_GPU", "1") != "0"
 
 ALLOWED_IMAGE_TYPES: Final[set[str]] = {
     "image/jpeg",
@@ -124,7 +133,7 @@ class Gemma4VisionChatHandler(Llava15ChatHandler):
 
         with suppress_stdout_stderr(disable=self.verbose):
             ctx_params = self._mtmd_cpp.mtmd_context_params_default()
-            ctx_params.use_gpu = True
+            ctx_params.use_gpu = MMPROJ_USE_GPU
             ctx_params.print_timings = self.verbose
             ctx_params.n_threads = llama_model.n_threads
             ctx_params.flash_attn_type = llama_cpp.LLAMA_FLASH_ATTN_TYPE_DISABLED
@@ -166,9 +175,9 @@ def create_llm(
         model_path=model_path,
         chat_handler=chat_handler,
         n_ctx=N_CTX,
-        n_gpu_layers=-1,
-        offload_kqv=True,
-        main_gpu=0,
+        n_gpu_layers=N_GPU_LAYERS,
+        offload_kqv=OFFLOAD_KQV,
+        main_gpu=MAIN_GPU,
         verbose=verbose,
     )
 

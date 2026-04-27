@@ -8,7 +8,15 @@ experiments/**/images/
 # 🔥 로그 / 결과 파일
 *.log
 *.txt
+!configs/draft_prompt.txt
+!requirements-dataset.txt
 outputs/
+
+# 🔥 데이터셋 원천/생성물
+data/raw/
+data/images/
+data/interim/
+data/processed/
 
 # 🔥 Python
 __pycache__/
