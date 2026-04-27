@@ -1,0 +1,58 @@
+{
+  "categories": [
+    {
+      "label": "카페",
+      "slug": "cafe",
+      "open_images_classes": ["Coffee", "Coffee cup", "Cake", "Dessert", "Table"]
+    },
+    {
+      "label": "식당",
+      "slug": "restaurant",
+      "open_images_classes": ["Food", "Pizza", "Sushi", "Hamburger", "Tableware"]
+    },
+    {
+      "label": "술집",
+      "slug": "bar",
+      "open_images_classes": ["Beer", "Wine glass", "Cocktail", "Bottle", "Pub"]
+    },
+    {
+      "label": "문화",
+      "slug": "culture",
+      "open_images_classes": ["Museum", "Sculpture", "Musical instrument", "Book", "Theater"]
+    },
+    {
+      "label": "운동",
+      "slug": "exercise",
+      "open_images_classes": ["Running", "Bicycle", "Ball", "Swimwear", "Sports equipment"]
+    },
+    {
+      "label": "쇼핑",
+      "slug": "shopping",
+      "open_images_classes": ["Shopping cart", "Handbag", "Shoe", "Clothing", "Fashion accessory", "Fruit", "Vegetable"]
+    },
+    {
+      "label": "공원",
+      "slug": "park",
+      "open_images_classes": ["Park", "Tree", "Fountain", "Mountain"],
+      "exclude_open_images_classes": [
+        "Car",
+        "Vehicle",
+        "Truck",
+        "Bus",
+        "Van",
+        "Motorcycle",
+        "Bicycle",
+        "Food",
+        "Fast food",
+        "Pizza",
+        "Hamburger",
+        "Tableware",
+        "Plate",
+        "Bowl",
+        "Wine glass",
+        "Beer",
+        "Bottle"
+      ]
+    }
+  ]
+}
