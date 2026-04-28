@@ -1,0 +1,12 @@
+# Baseline Korean stopwords for generated blog drafts.
+오늘
+정말
+너무
+기분
+이런
+있는
+있어
+있어요
+하면서
+같아
+같아요
