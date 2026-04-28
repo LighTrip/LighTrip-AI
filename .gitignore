@@ -10,7 +10,11 @@ experiments/**/images/
 *.txt
 !configs/draft_prompt.txt
 !requirements-dataset.txt
+!requirements-classifier.txt
+!experiments/category_classifier/stopwords_ko.txt
 outputs/
+experiments/category_classifier/artifacts/
+experiments/category_classifier/reports/
 
 # 🔥 데이터셋 원천/생성물
 data/raw/
