@@ -1,0 +1,456 @@
+{
+  "created_at": "2026-05-05T02:19:04",
+  "folds": 5,
+  "random_state": 42,
+  "labels": [
+    "공원",
+    "문화",
+    "쇼핑",
+    "술집",
+    "식당",
+    "운동",
+    "카페"
+  ],
+  "dataset": {
+    "sources": [
+      {
+        "path": "data_places365/processed/train.jsonl",
+        "size": 2039
+      },
+      {
+        "path": "data_places365/processed/valid.jsonl",
+        "size": 255
+      },
+      {
+        "path": "data_places365/processed/test.jsonl",
+        "size": 255
+      }
+    ],
+    "total_size": 2549,
+    "label_counts": {
+      "공원": 350,
+      "문화": 449,
+      "쇼핑": 250,
+      "술집": 250,
+      "식당": 300,
+      "운동": 500,
+      "카페": 450
+    }
+  },
+  "params": {
+    "max_features": 20000,
+    "min_df": 1,
+    "max_df": 0.95,
+    "ngram_max": 2,
+    "alpha": 1.0,
+    "c": 1.0,
+    "max_iter": 1000,
+    "solver": "lbfgs",
+    "class_weight": null
+  },
+  "selected_model": "linear_svm",
+  "models": [
+    {
+      "model": "nb",
+      "display_name": "Naive Bayes",
+      "folds": [
+        {
+          "fold": 1,
+          "train_size": 2039,
+          "valid_size": 510,
+          "accuracy": 0.8862745098039215,
+          "f1_macro": 0.8801423045032248,
+          "f1_weighted": 0.8858995765350524,
+          "fit_seconds": 0.07856476597953588,
+          "predict_seconds": 0.014824667945504189,
+          "predict_ms_per_sample": 0.0290679763637337
+        },
+        {
+          "fold": 2,
+          "train_size": 2039,
+          "valid_size": 510,
+          "accuracy": 0.8705882352941177,
+          "f1_macro": 0.8648350101321501,
+          "f1_weighted": 0.8697556340855898,
+          "fit_seconds": 0.07739335403311998,
+          "predict_seconds": 0.015016184072010219,
+          "predict_ms_per_sample": 0.029443498180412194
+        },
+        {
+          "fold": 3,
+          "train_size": 2039,
+          "valid_size": 510,
+          "accuracy": 0.8960784313725491,
+          "f1_macro": 0.8920775472194545,
+          "f1_weighted": 0.8956315347849757,
+          "fit_seconds": 0.07640195894055068,
+          "predict_seconds": 0.014757608063519001,
+          "predict_ms_per_sample": 0.028936486399056865
+        },
+        {
+          "fold": 4,
+          "train_size": 2039,
+          "valid_size": 510,
+          "accuracy": 0.8705882352941177,
+          "f1_macro": 0.8683779532595194,
+          "f1_weighted": 0.8698333134905039,
+          "fit_seconds": 0.08202672400511801,
+          "predict_seconds": 0.016890328959561884,
+          "predict_ms_per_sample": 0.033118292077572324
+        },
+        {
+          "fold": 5,
+          "train_size": 2040,
+          "valid_size": 509,
+          "accuracy": 0.9076620825147348,
+          "f1_macro": 0.9074706668268444,
+          "f1_weighted": 0.907608915316151,
+          "fit_seconds": 0.07182073895819485,
+          "predict_seconds": 0.011498693958856165,
+          "predict_ms_per_sample": 0.022590754339599537
+        }
+      ],
+      "summary": {
+        "accuracy_mean": 0.8862382988558881,
+        "accuracy_std": 0.016168310088056373,
+        "f1_macro_mean": 0.8825806963882388,
+        "f1_macro_std": 0.01755187918863566,
+        "fit_seconds_mean": 0.07724150838330388,
+        "fit_seconds_std": 0.0037000655650147552,
+        "predict_seconds_mean": 0.014597496599890292,
+        "predict_seconds_std": 0.0019437206420934575,
+        "predict_ms_per_sample_mean": 0.028631401472074925,
+        "predict_ms_per_sample_std": 0.0037935728738609535
+      },
+      "oof": {
+        "accuracy": 0.8862298940761083,
+        "f1_macro": 0.8828220903426366,
+        "classification_report": {
+          "공원": {
+            "precision": 0.9067796610169492,
+            "recall": 0.9171428571428571,
+            "f1-score": 0.9119318181818182,
+            "support": 350.0
+          },
+          "문화": {
+            "precision": 0.8590604026845637,
+            "recall": 0.8552338530066815,
+            "f1-score": 0.8571428571428571,
+            "support": 449.0
+          },
+          "쇼핑": {
+            "precision": 0.9813953488372092,
+            "recall": 0.844,
+            "f1-score": 0.9075268817204301,
+            "support": 250.0
+          },
+          "술집": {
+            "precision": 0.8584070796460177,
+            "recall": 0.776,
+            "f1-score": 0.8151260504201682,
+            "support": 250.0
+          },
+          "식당": {
+            "precision": 0.9836065573770492,
+            "recall": 0.8,
+            "f1-score": 0.8823529411764706,
+            "support": 300.0
+          },
+          "운동": {
+            "precision": 0.9094412331406551,
+            "recall": 0.944,
+            "f1-score": 0.9263984298331698,
+            "support": 500.0
+          },
+          "카페": {
+            "precision": 0.8033088235294118,
+            "recall": 0.9711111111111111,
+            "f1-score": 0.8792756539235413,
+            "support": 450.0
+          },
+          "accuracy": 0.8862298940761083,
+          "macro avg": {
+            "precision": 0.9002855866045509,
+            "recall": 0.8724982601800928,
+            "f1-score": 0.8828220903426366,
+            "support": 2549.0
+          },
+          "weighted avg": {
+            "precision": 0.8922452583969342,
+            "recall": 0.8862298940761083,
+            "f1-score": 0.885945725300529,
+            "support": 2549.0
+          }
+        }
+      }
+    },
+    {
+      "model": "logistic_regression",
+      "display_name": "Logistic Regression",
+      "folds": [
+        {
+          "fold": 1,
+          "train_size": 2039,
+          "valid_size": 510,
+          "accuracy": 0.9058823529411765,
+          "f1_macro": 0.900721595501763,
+          "f1_weighted": 0.9059235301948128,
+          "fit_seconds": 1.2409414140274748,
+          "predict_seconds": 0.020252527901902795,
+          "predict_ms_per_sample": 0.039710839023338815
+        },
+        {
+          "fold": 2,
+          "train_size": 2039,
+          "valid_size": 510,
+          "accuracy": 0.907843137254902,
+          "f1_macro": 0.9065884267710691,
+          "f1_weighted": 0.9079551539533297,
+          "fit_seconds": 1.2854825799586251,
+          "predict_seconds": 0.041002900106832385,
+          "predict_ms_per_sample": 0.08039784334673016
+        },
+        {
+          "fold": 3,
+          "train_size": 2039,
+          "valid_size": 510,
+          "accuracy": 0.9294117647058824,
+          "f1_macro": 0.9267712869750289,
+          "f1_weighted": 0.9291535666045077,
+          "fit_seconds": 1.934634311008267,
+          "predict_seconds": 0.05249013798311353,
+          "predict_ms_per_sample": 0.10292183918257555
+        },
+        {
+          "fold": 4,
+          "train_size": 2039,
+          "valid_size": 510,
+          "accuracy": 0.903921568627451,
+          "f1_macro": 0.9043624094099553,
+          "f1_weighted": 0.9039346792391941,
+          "fit_seconds": 1.1962056099437177,
+          "predict_seconds": 0.0337552260607481,
+          "predict_ms_per_sample": 0.06618671776617274
+        },
+        {
+          "fold": 5,
+          "train_size": 2040,
+          "valid_size": 509,
+          "accuracy": 0.9233791748526523,
+          "f1_macro": 0.9257059664395089,
+          "f1_weighted": 0.9235006872922488,
+          "fit_seconds": 2.277717266930267,
+          "predict_seconds": 0.08400741696823388,
+          "predict_ms_per_sample": 0.16504404119495852
+        }
+      ],
+      "summary": {
+        "accuracy_mean": 0.9140875996764128,
+        "accuracy_std": 0.011519884714205605,
+        "f1_macro_mean": 0.912829937019465,
+        "f1_macro_std": 0.012423976623018917,
+        "fit_seconds_mean": 1.5869962363736705,
+        "fit_seconds_std": 0.49023706300323683,
+        "predict_seconds_mean": 0.04630164180416614,
+        "predict_seconds_std": 0.02410429688019812,
+        "predict_ms_per_sample_mean": 0.09085225610275516,
+        "predict_ms_per_sample_std": 0.04738993532198042
+      },
+      "oof": {
+        "accuracy": 0.9140839544919577,
+        "f1_macro": 0.9128837405163572,
+        "classification_report": {
+          "공원": {
+            "precision": 0.9171270718232044,
+            "recall": 0.9485714285714286,
+            "f1-score": 0.9325842696629214,
+            "support": 350.0
+          },
+          "문화": {
+            "precision": 0.8744493392070485,
+            "recall": 0.8841870824053452,
+            "f1-score": 0.8792912513842748,
+            "support": 449.0
+          },
+          "쇼핑": {
+            "precision": 0.9865470852017937,
+            "recall": 0.88,
+            "f1-score": 0.9302325581395349,
+            "support": 250.0
+          },
+          "술집": {
+            "precision": 0.8714859437751004,
+            "recall": 0.868,
+            "f1-score": 0.8697394789579158,
+            "support": 250.0
+          },
+          "식당": {
+            "precision": 0.9194630872483222,
+            "recall": 0.9133333333333333,
+            "f1-score": 0.9163879598662208,
+            "support": 300.0
+          },
+          "운동": {
+            "precision": 0.9042145593869731,
+            "recall": 0.944,
+            "f1-score": 0.923679060665362,
+            "support": 500.0
+          },
+          "카페": {
+            "precision": 0.9478458049886621,
+            "recall": 0.9288888888888889,
+            "f1-score": 0.9382716049382717,
+            "support": 450.0
+          },
+          "accuracy": 0.9140839544919577,
+          "macro avg": {
+            "precision": 0.9173046988044434,
+            "recall": 0.9095686761712852,
+            "f1-score": 0.9128837405163572,
+            "support": 2549.0
+          },
+          "weighted avg": {
+            "precision": 0.9151068276968187,
+            "recall": 0.9140839544919577,
+            "f1-score": 0.9141535567056469,
+            "support": 2549.0
+          }
+        }
+      }
+    },
+    {
+      "model": "linear_svm",
+      "display_name": "Linear SVM",
+      "folds": [
+        {
+          "fold": 1,
+          "train_size": 2039,
+          "valid_size": 510,
+          "accuracy": 0.9294117647058824,
+          "f1_macro": 0.9278257561873176,
+          "f1_weighted": 0.9296816684825454,
+          "fit_seconds": 0.08990404906217009,
+          "predict_seconds": 0.011564222979359329,
+          "predict_ms_per_sample": 0.022674947018351623
+        },
+        {
+          "fold": 2,
+          "train_size": 2039,
+          "valid_size": 510,
+          "accuracy": 0.9176470588235294,
+          "f1_macro": 0.9152940755691535,
+          "f1_weighted": 0.9177195050257219,
+          "fit_seconds": 0.11145186296198517,
+          "predict_seconds": 0.014515095041133463,
+          "predict_ms_per_sample": 0.028460970668889144
+        },
+        {
+          "fold": 3,
+          "train_size": 2039,
+          "valid_size": 510,
+          "accuracy": 0.9490196078431372,
+          "f1_macro": 0.9476412694646417,
+          "f1_weighted": 0.948882607421618,
+          "fit_seconds": 0.10143815004266798,
+          "predict_seconds": 0.014668692951090634,
+          "predict_ms_per_sample": 0.02876214304135418
+        },
+        {
+          "fold": 4,
+          "train_size": 2039,
+          "valid_size": 510,
+          "accuracy": 0.8980392156862745,
+          "f1_macro": 0.8997871886955398,
+          "f1_weighted": 0.8982649168538309,
+          "fit_seconds": 0.0940218879841268,
+          "predict_seconds": 0.011436861008405685,
+          "predict_ms_per_sample": 0.02242521766354056
+        },
+        {
+          "fold": 5,
+          "train_size": 2040,
+          "valid_size": 509,
+          "accuracy": 0.9469548133595285,
+          "f1_macro": 0.9498496153255107,
+          "f1_weighted": 0.9468893540474165,
+          "fit_seconds": 0.08112250303383917,
+          "predict_seconds": 0.0111820810707286,
+          "predict_ms_per_sample": 0.021968725089840078
+        }
+      ],
+      "summary": {
+        "accuracy_mean": 0.9282144920836704,
+        "accuracy_std": 0.021258550611376718,
+        "f1_macro_mean": 0.9280795810484326,
+        "f1_macro_std": 0.02133416912249472,
+        "fit_seconds_mean": 0.09558769061695785,
+        "fit_seconds_std": 0.011509745986637933,
+        "predict_seconds_mean": 0.012673390610143543,
+        "predict_seconds_std": 0.0017575813689855377,
+        "predict_ms_per_sample_mean": 0.024858400696395118,
+        "predict_ms_per_sample_std": 0.003437142324998861
+      },
+      "oof": {
+        "accuracy": 0.9282071400549236,
+        "f1_macro": 0.92800775985132,
+        "classification_report": {
+          "공원": {
+            "precision": 0.925207756232687,
+            "recall": 0.9542857142857143,
+            "f1-score": 0.9395218002812941,
+            "support": 350.0
+          },
+          "문화": {
+            "precision": 0.9002267573696145,
+            "recall": 0.8841870824053452,
+            "f1-score": 0.8921348314606742,
+            "support": 449.0
+          },
+          "쇼핑": {
+            "precision": 0.9672131147540983,
+            "recall": 0.944,
+            "f1-score": 0.9554655870445343,
+            "support": 250.0
+          },
+          "술집": {
+            "precision": 0.8735632183908046,
+            "recall": 0.912,
+            "f1-score": 0.8923679060665362,
+            "support": 250.0
+          },
+          "식당": {
+            "precision": 0.9302325581395349,
+            "recall": 0.9333333333333333,
+            "f1-score": 0.9317803660565723,
+            "support": 300.0
+          },
+          "운동": {
+            "precision": 0.9455645161290323,
+            "recall": 0.938,
+            "f1-score": 0.9417670682730923,
+            "support": 500.0
+          },
+          "카페": {
+            "precision": 0.9483146067415731,
+            "recall": 0.9377777777777778,
+            "f1-score": 0.9430167597765364,
+            "support": 450.0
+          },
+          "accuracy": 0.9282071400549236,
+          "macro avg": {
+            "precision": 0.9271889325367635,
+            "recall": 0.92908341540031,
+            "f1-score": 0.92800775985132,
+            "support": 2549.0
+          },
+          "weighted avg": {
+            "precision": 0.928525778959085,
+            "recall": 0.9282071400549236,
+            "f1-score": 0.9282599955100127,
+            "support": 2549.0
+          }
+        }
+      }
+    }
+  ]
+}
