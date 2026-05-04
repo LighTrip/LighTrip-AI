@@ -16,7 +16,7 @@ from experiments.category_classifier.src.data import load_texts_from_jsonl
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="저장된 카테고리 분류 모델로 추론합니다.")
+    parser = argparse.ArgumentParser(description="저장된 TF-IDF 카테고리 분류 pipeline으로 추론합니다.")
     parser.add_argument(
         "--model-path",
         type=Path,

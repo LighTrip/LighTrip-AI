@@ -25,26 +25,69 @@ from experiments.category_classifier.src.models import build_pipeline
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="TF-IDF + Naive Bayes 카테고리 분류 baseline을 학습합니다."
+        description="TF-IDF 기반 카테고리 분류 모델을 학습합니다."
     )
-    parser.add_argument("--model", default="nb", choices=["nb"])
-    parser.add_argument("--train", type=Path, default=Path("data/processed/train.jsonl"))
-    parser.add_argument("--valid", type=Path, default=Path("data/processed/valid.jsonl"))
-    parser.add_argument("--test", type=Path, default=Path("data/processed/test.jsonl"))
+    parser.add_argument("--model", default="nb", choices=["nb", "logistic_regression"])
+    parser.add_argument(
+        "--train",
+        type=Path,
+        default=Path("data_places365/processed/train.jsonl"),
+    )
+    parser.add_argument(
+        "--valid",
+        type=Path,
+        default=Path("data_places365/processed/valid.jsonl"),
+    )
+    parser.add_argument(
+        "--test",
+        type=Path,
+        default=Path("data_places365/processed/test.jsonl"),
+    )
     parser.add_argument("--text-field", default="generated_text")
     parser.add_argument("--label-field", default="label")
-    parser.add_argument("--stopwords", type=Path, default=Path("experiments/category_classifier/stopwords_ko.txt"))
-    parser.add_argument("--artifact-dir", type=Path, default=Path("experiments/category_classifier/artifacts"))
-    parser.add_argument("--report-dir", type=Path, default=Path("experiments/category_classifier/reports"))
+    parser.add_argument(
+        "--stopwords",
+        type=Path,
+        default=Path("experiments/category_classifier/stopwords_ko.txt"),
+    )
+    parser.add_argument(
+        "--artifact-dir",
+        type=Path,
+        default=Path("experiments/category_classifier/artifacts"),
+    )
+    parser.add_argument(
+        "--report-dir",
+        type=Path,
+        default=Path("experiments/category_classifier/reports"),
+    )
     parser.add_argument("--max-features", type=int, default=20000)
     parser.add_argument("--min-df", type=int, default=1)
     parser.add_argument("--max-df", type=float, default=0.95)
     parser.add_argument("--ngram-max", type=int, default=2)
     parser.add_argument("--alpha", type=float, default=1.0)
+    parser.add_argument(
+        "--c",
+        type=float,
+        default=1.0,
+        help="Logistic Regression regularization strength inverse.",
+    )
+    parser.add_argument(
+        "--max-iter",
+        type=int,
+        default=1000,
+        help="Logistic Regression 최대 반복 횟수입니다.",
+    )
+    parser.add_argument("--solver", default="lbfgs", help="Logistic Regression solver입니다.")
+    parser.add_argument(
+        "--class-weight",
+        choices=["balanced"],
+        help="Logistic Regression class_weight 옵션입니다.",
+    )
     return parser.parse_args()
 
 
 def split_metrics(
+    model_name: str,
     split_name: str,
     y_true: list[str],
     y_pred: list[str],
@@ -53,13 +96,13 @@ def split_metrics(
 ) -> dict[str, Any]:
     metrics = evaluate_predictions(y_true, y_pred, labels)
     save_classification_report(
-        report_dir / f"{split_name}_classification_report.txt",
+        report_dir / f"{model_name}_{split_name}_classification_report.txt",
         y_true,
         y_pred,
         labels,
     )
     save_confusion_matrix(
-        report_dir / f"{split_name}_confusion_matrix.csv",
+        report_dir / f"{model_name}_{split_name}_confusion_matrix.csv",
         y_true,
         y_pred,
         labels,
@@ -74,6 +117,7 @@ def main() -> None:
         args.train,
         text_field=args.text_field,
         label_field=args.label_field,
+        drop_empty_text=True,
     )
     valid_texts, valid_labels = load_text_label_dataset(
         args.valid,
@@ -95,6 +139,10 @@ def main() -> None:
         max_df=args.max_df,
         ngram_max=args.ngram_max,
         alpha=args.alpha,
+        c=args.c,
+        max_iter=args.max_iter,
+        solver=args.solver,
+        class_weight=args.class_weight,
     )
     pipeline.fit(train_texts, train_labels)
 
@@ -121,9 +169,27 @@ def main() -> None:
             "max_df": args.max_df,
             "ngram_max": args.ngram_max,
             "alpha": args.alpha,
+            "c": args.c,
+            "max_iter": args.max_iter,
+            "solver": args.solver,
+            "class_weight": args.class_weight,
         },
-        "valid": split_metrics("valid", valid_labels, valid_pred, labels, args.report_dir),
-        "test": split_metrics("test", test_labels, test_pred, labels, args.report_dir),
+        "valid": split_metrics(
+            args.model,
+            "valid",
+            valid_labels,
+            valid_pred,
+            labels,
+            args.report_dir,
+        ),
+        "test": split_metrics(
+            args.model,
+            "test",
+            test_labels,
+            test_pred,
+            labels,
+            args.report_dir,
+        ),
     }
 
     artifact_path = args.artifact_dir / f"{args.model}_tfidf.joblib"

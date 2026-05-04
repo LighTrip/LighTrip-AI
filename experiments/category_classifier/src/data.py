@@ -23,6 +23,7 @@ def load_text_label_dataset(
     path: Path,
     text_field: str = "generated_text",
     label_field: str = "label",
+    drop_empty_text: bool = False,
 ) -> tuple[list[str], list[str]]:
     rows = read_jsonl(path)
     texts: list[str] = []
@@ -32,6 +33,8 @@ def load_text_label_dataset(
         text = row.get(text_field)
         label = row.get(label_field)
         if not isinstance(text, str) or not text.strip():
+            if drop_empty_text:
+                continue
             raise ValueError(f"{path}:{index} '{text_field}' 값이 비어 있습니다.")
         if not isinstance(label, str) or not label.strip():
             raise ValueError(f"{path}:{index} '{label_field}' 값이 비어 있습니다.")
