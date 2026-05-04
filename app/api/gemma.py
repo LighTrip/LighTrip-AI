@@ -1,3 +1,4 @@
+import logging
 import time
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -9,6 +10,7 @@ from app.services.gemma_service import (
 )
 
 router = APIRouter(prefix="/gemma", tags=["gemma"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/generate")
@@ -52,4 +54,5 @@ async def generate(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"추론 중 오류가 발생했습니다: {exc}")
+        logger.exception("Gemma inference failed")
+        raise HTTPException(status_code=500, detail="추론 중 오류가 발생했습니다.") from exc

@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
-import time
 from pathlib import Path
 from typing import Any
 
@@ -11,10 +9,19 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.dataset.common import labels_by_slug, read_jsonl, write_jsonl
-
-
-IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+from scripts.dataset.common import (
+    build_draft_row,
+    configure_gemma_environment,
+    filter_rows_by_labels,
+    generate_text_for_image,
+    guess_content_type,
+    iter_image_files,
+    labels_by_slug,
+    load_generation_runtime,
+    parse_category_filter,
+    read_jsonl,
+    write_jsonl,
+)
 CATEGORY_HINTS = {
     "카페": "커피, 음료, 디저트, 조용한 자리, 카페 분위기 같은 단서를 자연스럽게 포함해라.",
     "식당": "식사, 메뉴, 음식 맛, 반찬, 한 끼 같은 단서를 자연스럽게 포함해라.",
@@ -42,48 +49,14 @@ SHOPPING_CONTEXT_HINTS = {
 }
 
 
-def guess_content_type(path: Path) -> str:
-    suffix = path.suffix.lower()
-    if suffix in {".jpg", ".jpeg"}:
-        return "image/jpeg"
-    if suffix == ".png":
-        return "image/png"
-    if suffix == ".webp":
-        return "image/webp"
-    return "application/octet-stream"
-
-
 def iter_images(input_dir: Path, slug_to_label: dict[str, str]) -> list[tuple[Path, str, str]]:
     images: list[tuple[Path, str, str]] = []
     for slug, label in slug_to_label.items():
         category_dir = input_dir / slug
         if not category_dir.exists():
             continue
-        for path in sorted(category_dir.rglob("*")):
-            if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES:
-                images.append((path, slug, label))
+        images.extend((path, slug, label) for path in iter_image_files(category_dir))
     return images
-
-
-def parse_category_filter(value: str, slug_to_label: dict[str, str]) -> dict[str, str]:
-    if not value.strip():
-        return slug_to_label
-
-    requested = {item.strip() for item in value.split(",") if item.strip()}
-    labels_to_slug = {label: slug for slug, label in slug_to_label.items()}
-    selected: dict[str, str] = {}
-
-    for item in requested:
-        if item in slug_to_label:
-            selected[item] = slug_to_label[item]
-        elif item in labels_to_slug:
-            slug = labels_to_slug[item]
-            selected[slug] = item
-        else:
-            allowed = ", ".join([*slug_to_label.keys(), *labels_to_slug.keys()])
-            raise ValueError(f"알 수 없는 카테고리입니다: {item}. 사용 가능: {allowed}")
-
-    return selected
 
 
 def build_row_id(slug: str, image_path: Path) -> str:
@@ -163,14 +136,7 @@ def load_categories_and_replace_labels(
 
 def load_existing_rows(args: argparse.Namespace, replace_labels: set[str]) -> list[dict]:
     existing_rows = [] if args.overwrite else read_jsonl(args.output)
-
-    if not replace_labels:
-        return existing_rows
-
-    return [
-        row for row in existing_rows
-        if str(row.get("label", "")) not in replace_labels
-    ]
+    return filter_rows_by_labels(existing_rows, replace_labels)
 
 
 def build_prompt_from_args(
@@ -200,89 +166,6 @@ def print_dry_run_sample(
     print(f"label: {label}")
     print("user_prompt:")
     print(dataset_prompt or "(empty)")
-
-
-def configure_gemma_environment(args: argparse.Namespace) -> None:
-    if not args.enable_cuda_graphs:
-        os.environ.setdefault("GGML_CUDA_DISABLE_GRAPHS", "1")
-
-    if not args.full_gpu:
-        os.environ.setdefault("GEMMA_MODEL_FILENAME", "gemma-4-E2B-it-Q4_K_S.gguf")
-        os.environ.setdefault("GEMMA_N_CTX", "768")
-        os.environ.setdefault("GEMMA_MAX_TOKENS", "64")
-        os.environ.setdefault("GEMMA_N_GPU_LAYERS", str(args.gpu_layers))
-        os.environ.setdefault("GEMMA_OFFLOAD_KQV", "0")
-
-
-def load_generation_runtime() -> tuple[set[str], Any, Any]:
-    from app.services.gemma_service import (
-        ALLOWED_IMAGE_TYPES,
-        generate_blog_draft_from_bytes,
-        get_llm,
-        load_model,
-    )
-
-    load_model(verbose=True)
-    llm = get_llm()
-    if llm is None:
-        raise RuntimeError("Gemma4 모델 로드에 실패했습니다.")
-
-    return ALLOWED_IMAGE_TYPES, generate_blog_draft_from_bytes, llm
-
-
-def generate_text_for_image(
-    *,
-    generate_blog_draft_from_bytes: Any,
-    llm: Any,
-    image_path: Path,
-    dataset_prompt: str,
-) -> tuple[str, float]:
-    started_at = time.perf_counter()
-    generated_text = generate_blog_draft_from_bytes(
-        llm=llm,
-        image_bytes=image_path.read_bytes(),
-        filename=image_path.name,
-        user_prompt=dataset_prompt,
-    )
-    elapsed = round(time.perf_counter() - started_at, 2)
-    return generated_text, elapsed
-
-
-def build_generated_row(
-    args: argparse.Namespace,
-    *,
-    row_id: str,
-    image_path: Path,
-    generated_text: str,
-    label: str,
-    source_label: str,
-    dataset_prompt: str,
-    elapsed: float,
-) -> dict:
-    row = {
-        "id": row_id,
-        "image": str(image_path),
-        "generated_text": generated_text,
-        "label": label,
-    }
-
-    if args.include_metadata:
-        row.update(
-            {
-                "source": "local",
-                "source_label": source_label,
-                "generation_prompt_type": (
-                    "custom" if args.no_category_hint else "category_hint"
-                ),
-                "elapsed_seconds": elapsed,
-                "quality_status": "pending",
-            }
-        )
-
-    if args.include_prompt:
-        row["generation_user_prompt"] = dataset_prompt
-
-    return row
 
 
 def generate_open_images_rows(
@@ -320,15 +203,21 @@ def generate_open_images_rows(
             image_path=image_path,
             dataset_prompt=dataset_prompt,
         )
-        row = build_generated_row(
-            args,
+        row = build_draft_row(
             row_id=row_id,
             image_path=image_path,
             generated_text=generated_text,
             label=label,
             source_label=source_label,
+            include_image=True,
+            include_metadata=args.include_metadata,
+            include_prompt=args.include_prompt,
             dataset_prompt=dataset_prompt,
-            elapsed=elapsed,
+            generation_prompt_type=(
+                "custom" if args.no_category_hint else "category_hint"
+            ),
+            source="local",
+            elapsed_seconds=elapsed,
         )
 
         rows.append(row)
@@ -353,7 +242,12 @@ def main() -> None:
         print_dry_run_sample(args, images)
         return
 
-    configure_gemma_environment(args)
+    configure_gemma_environment(
+        enable_cuda_graphs=args.enable_cuda_graphs,
+        full_gpu=args.full_gpu,
+        gpu_layers=args.gpu_layers,
+        n_ctx=768,
+    )
     allowed_image_types, generate_blog_draft_from_bytes, llm = load_generation_runtime()
     generate_open_images_rows(
         args,

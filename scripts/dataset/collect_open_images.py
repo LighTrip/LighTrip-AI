@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import math
-import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -11,7 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.dataset.common import load_categories
+from scripts.dataset.common import load_categories, remove_tree_inside_root
 
 
 def parse_category_filter(value: str, categories: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -108,7 +107,7 @@ def main() -> None:
         }
         target_dir = args.output_dir / slug
         if args.overwrite_output and target_dir.exists():
-            shutil.rmtree(target_dir)
+            remove_tree_inside_root(target_dir, args.output_dir)
         target_dir.mkdir(parents=True, exist_ok=True)
 
         copied = 0

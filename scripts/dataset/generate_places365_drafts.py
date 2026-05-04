@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 import argparse
-import json
-import os
 import sys
-import time
 from pathlib import Path
 from typing import Any
 
@@ -12,10 +9,21 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.dataset.common import labels_by_slug, read_jsonl
-
-
-IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+from scripts.dataset.common import (
+    DEFAULT_PLACES365_DIR,
+    append_jsonl,
+    build_draft_row,
+    configure_gemma_environment,
+    filter_rows_by_labels,
+    generate_text_for_image,
+    guess_content_type,
+    iter_image_files,
+    labels_by_slug,
+    load_generation_runtime,
+    parse_category_filter,
+    read_jsonl,
+    write_jsonl,
+)
 
 CATEGORY_HINTS = {
     "카페": "카페에서 시간을 보내며 음료나 디저트를 즐기는 자연스러운 상황을 떠올려라.",
@@ -28,63 +36,12 @@ CATEGORY_HINTS = {
 }
 
 
-def append_jsonl(path: Path, row: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(row, ensure_ascii=False) + "\n")
-        f.flush()
-
-
-def guess_content_type(path: Path) -> str:
-    suffix = path.suffix.lower()
-
-    if suffix in {".jpg", ".jpeg"}:
-        return "image/jpeg"
-    if suffix == ".png":
-        return "image/png"
-    if suffix == ".webp":
-        return "image/webp"
-
-    return "application/octet-stream"
-
-
-def parse_category_filter(value: str, slug_to_label: dict[str, str]) -> dict[str, str]:
-    if not value.strip():
-        return slug_to_label
-
-    requested = {item.strip() for item in value.split(",") if item.strip()}
-    labels_to_slug = {label: slug for slug, label in slug_to_label.items()}
-
-    selected: dict[str, str] = {}
-
-    for item in requested:
-        if item in slug_to_label:
-            selected[item] = slug_to_label[item]
-        elif item in labels_to_slug:
-            slug = labels_to_slug[item]
-            selected[slug] = item
-        else:
-            allowed = ", ".join([*slug_to_label.keys(), *labels_to_slug.keys()])
-            raise ValueError(f"알 수 없는 카테고리입니다: {item}. 사용 가능: {allowed}")
-
-    return selected
-
-
 def remove_etc_category(slug_to_label: dict[str, str]) -> dict[str, str]:
     return {
         slug: label
         for slug, label in slug_to_label.items()
         if label != "기타"
     }
-
-
-def iter_image_files(source_dir: Path) -> list[Path]:
-    return [
-        path
-        for path in sorted(source_dir.rglob("*"))
-        if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES
-    ]
 
 
 def iter_places365_source_dirs(category_dir: Path) -> list[Path]:
@@ -150,7 +107,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--input-dir",
         type=Path,
-        default=Path("/home/cvlab/Desktop/Yoon/LighTrip-AI/data_places365"),
+        default=DEFAULT_PLACES365_DIR,
     )
     parser.add_argument(
         "--output",
@@ -207,17 +164,10 @@ def prepare_existing_rows(args: argparse.Namespace, replace_labels: set[str]) ->
 
     existing_rows = [] if args.overwrite else read_jsonl(args.output)
 
-    if not replace_labels:
-        return existing_rows
+    kept_rows = filter_rows_by_labels(existing_rows, replace_labels)
 
-    kept_rows = [
-        row for row in existing_rows
-        if str(row.get("label", "")) not in replace_labels
-    ]
-
-    with args.output.open("w", encoding="utf-8") as f:
-        for row in kept_rows:
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    if replace_labels:
+        write_jsonl(args.output, kept_rows)
 
     return kept_rows
 
@@ -251,36 +201,7 @@ def print_dry_run_sample(
     print(dataset_prompt or "(empty)")
 
 
-def configure_gemma_environment(args: argparse.Namespace) -> None:
-    if not args.enable_cuda_graphs:
-        os.environ.setdefault("GGML_CUDA_DISABLE_GRAPHS", "1")
-
-    if not args.full_gpu:
-        os.environ.setdefault("GEMMA_MODEL_FILENAME", "gemma-4-E2B-it-Q4_K_S.gguf")
-        os.environ.setdefault("GEMMA_N_CTX", "1024")
-        os.environ.setdefault("GEMMA_MAX_TOKENS", "64")
-        os.environ.setdefault("GEMMA_N_GPU_LAYERS", str(args.gpu_layers))
-        os.environ.setdefault("GEMMA_OFFLOAD_KQV", "0")
-
-
-def load_generation_runtime() -> tuple[set[str], Any, Any]:
-    from app.services.gemma_service import (
-        ALLOWED_IMAGE_TYPES,
-        generate_blog_draft_from_bytes,
-        get_llm,
-        load_model,
-    )
-
-    load_model(verbose=True)
-    llm = get_llm()
-
-    if llm is None:
-        raise RuntimeError("Gemma4 모델 로드에 실패했습니다.")
-
-    return ALLOWED_IMAGE_TYPES, generate_blog_draft_from_bytes, llm
-
-
-def generate_text_for_image(
+def try_generate_text_for_image(
     *,
     generate_blog_draft_from_bytes: Any,
     llm: Any,
@@ -288,54 +209,15 @@ def generate_text_for_image(
     dataset_prompt: str,
 ) -> tuple[str, float] | None:
     try:
-        started_at = time.perf_counter()
-        generated_text = generate_blog_draft_from_bytes(
+        return generate_text_for_image(
+            generate_blog_draft_from_bytes=generate_blog_draft_from_bytes,
             llm=llm,
-            image_bytes=image_path.read_bytes(),
-            filename=image_path.name,
-            user_prompt=dataset_prompt,
+            image_path=image_path,
+            dataset_prompt=dataset_prompt,
         )
-        elapsed = round(time.perf_counter() - started_at, 2)
-        return generated_text, elapsed
     except Exception as e:
         print(f"[ERROR] {image_path} 생성 실패: {e}")
         return None
-
-
-def build_generated_row(
-    args: argparse.Namespace,
-    *,
-    row_id: str,
-    image_path: Path,
-    generated_text: str,
-    label: str,
-    source_label: str,
-    elapsed: float,
-) -> dict:
-    row = {
-        "id": row_id,
-        "generated_text": generated_text,
-        "label": label,
-    }
-
-    if args.include_metadata:
-        row.update(
-            {
-                "image": str(image_path),
-                "source": "places365",
-                "source_label": source_label,
-                "generation_prompt_type": (
-                    "custom" if args.no_category_hint else "category_hint"
-                ),
-                "elapsed_seconds": elapsed,
-                "quality_status": "pending",
-            }
-        )
-
-    if args.include_prompt:
-        row["generation_user_prompt"] = build_prompt_from_args(args, label)
-
-    return row
 
 
 def generate_places365_rows(
@@ -367,7 +249,7 @@ def generate_places365_rows(
             continue
 
         dataset_prompt = build_prompt_from_args(args, label)
-        generated = generate_text_for_image(
+        generated = try_generate_text_for_image(
             generate_blog_draft_from_bytes=generate_blog_draft_from_bytes,
             llm=llm,
             image_path=image_path,
@@ -377,14 +259,20 @@ def generate_places365_rows(
             continue
 
         generated_text, elapsed = generated
-        row = build_generated_row(
-            args,
+        row = build_draft_row(
             row_id=row_id,
             image_path=image_path,
             generated_text=generated_text,
             label=label,
+            include_metadata=args.include_metadata,
+            include_prompt=args.include_prompt,
+            dataset_prompt=dataset_prompt,
+            generation_prompt_type=(
+                "custom" if args.no_category_hint else "category_hint"
+            ),
+            source="places365",
             source_label=source_label,
-            elapsed=elapsed,
+            elapsed_seconds=elapsed,
         )
 
         append_jsonl(args.output, row)
@@ -429,7 +317,12 @@ def main() -> None:
         print_dry_run_sample(args, images)
         return
 
-    configure_gemma_environment(args)
+    configure_gemma_environment(
+        enable_cuda_graphs=args.enable_cuda_graphs,
+        full_gpu=args.full_gpu,
+        gpu_layers=args.gpu_layers,
+        n_ctx=1024,
+    )
     allowed_image_types, generate_blog_draft_from_bytes, llm = load_generation_runtime()
     total_rows = generate_places365_rows(
         args,

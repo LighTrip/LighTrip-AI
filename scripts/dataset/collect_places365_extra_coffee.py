@@ -1,7 +1,10 @@
 import os
+from pathlib import Path
+
 from datasets import load_dataset
 
-SAVE_ROOT = "/home/cvlab/Desktop/Yoon/LighTrip-AI/data_places365"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+SAVE_ROOT = PROJECT_ROOT / "data_places365"
 DATASET_NAME = "Andron00e/Places365-custom"
 SPLIT = "train"
 
