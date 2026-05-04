@@ -21,7 +21,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="저장된 TF-IDF 카테고리 분류 pipeline으로 추론합니다.")
     parser.add_argument(
         "--model",
-        default="nb",
+        default="linear_svm",
         choices=SUPPORTED_MODELS,
         help="--model-path를 지정하지 않았을 때 사용할 artifact 모델명입니다.",
     )

@@ -29,7 +29,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--model",
-        default="nb",
+        default="linear_svm",
         choices=["nb", "logistic_regression", "linear_svm"],
     )
     parser.add_argument(
