@@ -14,13 +14,21 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from experiments.category_classifier.src.data import load_texts_from_jsonl
 
+SUPPORTED_MODELS = ("nb", "logistic_regression", "linear_svm")
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="저장된 TF-IDF 카테고리 분류 pipeline으로 추론합니다.")
     parser.add_argument(
+        "--model",
+        default="nb",
+        choices=SUPPORTED_MODELS,
+        help="--model-path를 지정하지 않았을 때 사용할 artifact 모델명입니다.",
+    )
+    parser.add_argument(
         "--model-path",
         type=Path,
-        default=Path("experiments/category_classifier/artifacts/nb_tfidf.joblib"),
+        help="저장된 pipeline artifact 경로입니다.",
     )
     parser.add_argument("--text", action="append", help="분류할 텍스트입니다. 여러 번 입력할 수 있습니다.")
     parser.add_argument("--input-jsonl", type=Path, help="분류할 JSONL 파일입니다.")
@@ -82,7 +90,10 @@ def main() -> None:
     if not args.text and not args.input_jsonl:
         raise SystemExit("--text 또는 --input-jsonl 중 하나는 필요합니다.")
 
-    artifact = joblib.load(args.model_path)
+    model_path = args.model_path or Path(
+        f"experiments/category_classifier/artifacts/{args.model}_tfidf.joblib"
+    )
+    artifact = joblib.load(model_path)
 
     rows: list[dict[str, Any]] = []
     if args.text:

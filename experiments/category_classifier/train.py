@@ -27,7 +27,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="TF-IDF 기반 카테고리 분류 모델을 학습합니다."
     )
-    parser.add_argument("--model", default="nb", choices=["nb", "logistic_regression"])
+    parser.add_argument(
+        "--model",
+        default="nb",
+        choices=["nb", "logistic_regression", "linear_svm"],
+    )
     parser.add_argument(
         "--train",
         type=Path,
@@ -69,19 +73,19 @@ def parse_args() -> argparse.Namespace:
         "--c",
         type=float,
         default=1.0,
-        help="Logistic Regression regularization strength inverse.",
+        help="Logistic Regression/Linear SVM regularization strength inverse.",
     )
     parser.add_argument(
         "--max-iter",
         type=int,
         default=1000,
-        help="Logistic Regression 최대 반복 횟수입니다.",
+        help="Logistic Regression/Linear SVM 최대 반복 횟수입니다.",
     )
     parser.add_argument("--solver", default="lbfgs", help="Logistic Regression solver입니다.")
     parser.add_argument(
         "--class-weight",
         choices=["balanced"],
-        help="Logistic Regression class_weight 옵션입니다.",
+        help="Logistic Regression/Linear SVM class_weight 옵션입니다.",
     )
     return parser.parse_args()
 
