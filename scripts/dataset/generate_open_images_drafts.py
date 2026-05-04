@@ -22,6 +22,7 @@ CATEGORY_HINTS = {
     "운동": "러닝, 헬스, 요가, 자전거, 땀, 몸이 가벼워지는 느낌 같은 단서를 자연스럽게 포함해라.",
     "쇼핑": "백화점 쇼핑, 옷 쇼핑, 마트 장보기 중 이미지와 가장 어울리는 맥락으로 써라. 매장, 진열대, 구경, 고르다, 구매, 쇼핑백, 장바구니, 옷, 신발, 식료품 같은 단서를 자연스럽게 포함해라.",
     "공원": "산책, 나무, 공원, 분수, 산, 숲길, 바람, 자연 속 휴식 같은 맥락으로 써라. 야외를 천천히 걷거나 쉬어가는 블로그 기록처럼 자연스럽게 작성해라.",
+    "기타": "특정 카테고리 단어를 억지로 넣지 말고, 이미지 속 장소나 활동을 자연스러운 방문 기록처럼 써라.",
 }
 PARK_CONTEXT_HINTS = {
     "park": "공원 산책로나 잔디밭을 천천히 걷는 느낌으로 써라.",
@@ -130,6 +131,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="이미지 폴더를 순회하며 Gemma4 초안을 JSONL로 생성합니다.")
     parser.add_argument("--input-dir", type=Path, default=Path("data/images"))
     parser.add_argument("--output", type=Path, default=Path("data/interim/generated_drafts.jsonl"))
+    parser.add_argument("--config-path", type=Path, default=Path("configs/dataset_categories.json"))
     parser.add_argument("--limit-per-category", type=int, default=0)
     parser.add_argument("--limit-total", type=int, default=0)
     parser.add_argument("--categories", default="")
@@ -145,9 +147,9 @@ def main() -> None:
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
 
-    slug_to_label = parse_category_filter(args.categories, labels_by_slug())
+    slug_to_label = parse_category_filter(args.categories, labels_by_slug(args.config_path))
     existing_rows = [] if args.overwrite else read_jsonl(args.output)
-    replace_slug_to_label = parse_category_filter(args.replace_categories, labels_by_slug())
+    replace_slug_to_label = parse_category_filter(args.replace_categories, labels_by_slug(args.config_path))
     replace_labels = set(replace_slug_to_label.values())
     if replace_labels:
         existing_rows = [
@@ -238,7 +240,7 @@ def main() -> None:
             row.update(
                 {
                     "source": "local",
-                    "source_label": "",
+                    "source_label": source_label,
                     "generation_prompt_type": "custom" if args.no_category_hint else "category_hint",
                     "elapsed_seconds": elapsed,
                     "quality_status": "pending",

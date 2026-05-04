@@ -1,0 +1,170 @@
+{
+  "dataset": "Andron00e/Places365-custom",
+  "split": "train",
+  "categories": [
+    {
+      "label": "카페",
+      "slug": "cafe",
+      "places365_labels": [
+        "bakery shop",
+        "cafeteria",
+        "coffee shop",
+        "ice cream parlor"
+      ]
+    },
+    {
+      "label": "식당",
+      "slug": "restaurant",
+      "places365_labels": [
+        "delicatessen",
+        "diner outdoor",
+        "dining hall",
+        "dining room",
+        "fastfood restaurant",
+        "food court",
+        "pizzeria",
+        "restaurant",
+        "restaurant patio",
+        "sushi bar"
+      ]
+    },
+    {
+      "label": "술집",
+      "slug": "bar",
+      "places365_labels": [
+        "bar",
+        "beer garden",
+        "beer hall",
+        "discotheque",
+        "pub indoor",
+        "wet bar"
+      ]
+    },
+    {
+      "label": "문화",
+      "slug": "culture",
+      "places365_labels": [
+        "amphitheater",
+        "arena performance",
+        "art gallery",
+        "art school",
+        "art studio",
+        "auditorium",
+        "library indoor",
+        "library outdoor",
+        "movie theater indoor",
+        "museum indoor",
+        "museum outdoor",
+        "music studio",
+        "natural history museum",
+        "orchestra pit",
+        "science museum",
+        "stage indoor",
+        "stage outdoor"
+      ]
+    },
+    {
+      "label": "운동",
+      "slug": "exercise",
+      "places365_labels": [
+        "athletic field outdoor",
+        "baseball field",
+        "basketball court indoor",
+        "bowling alley",
+        "boxing ring",
+        "football field",
+        "golf course",
+        "gymnasium indoor",
+        "ice skating rink indoor",
+        "ice skating rink outdoor",
+        "martial arts gym",
+        "racecourse",
+        "raceway",
+        "ski resort",
+        "ski slope",
+        "soccer field",
+        "stadium baseball",
+        "stadium football",
+        "stadium soccer",
+        "swimming pool indoor",
+        "swimming pool outdoor",
+        "volleyball court outdoor",
+        "water park"
+      ]
+    },
+    {
+      "label": "쇼핑",
+      "slug": "shopping",
+      "places365_labels": [
+        "bookstore",
+        "candy store",
+        "clothing store",
+        "department store",
+        "drugstore",
+        "fabric store",
+        "flea market indoor",
+        "florist shop indoor",
+        "general store indoor",
+        "general store outdoor",
+        "gift shop",
+        "jewelry shop",
+        "market indoor",
+        "market outdoor",
+        "pet shop",
+        "pharmacy",
+        "shoe shop",
+        "shopfront",
+        "shopping mall indoor",
+        "supermarket",
+        "toyshop"
+      ]
+    },
+    {
+      "label": "공원",
+      "slug": "park",
+      "places365_labels": [
+        "amusement park",
+        "botanical garden",
+        "formal garden",
+        "fountain",
+        "japanese garden",
+        "lawn",
+        "park",
+        "picnic area",
+        "playground",
+        "roof garden",
+        "topiary garden",
+        "vegetable garden",
+        "yard",
+        "zen garden"
+      ]
+    },
+    {
+      "label": "기타",
+      "slug": "other",
+      "places365_labels": [
+        "airfield",
+        "airport terminal",
+        "apartment building outdoor",
+        "bridge",
+        "building facade",
+        "bus station indoor",
+        "campus",
+        "conference center",
+        "conference room",
+        "downtown",
+        "hotel outdoor",
+        "hotel room",
+        "lobby",
+        "office",
+        "office building",
+        "parking lot",
+        "plaza",
+        "residential neighborhood",
+        "street",
+        "train station platform",
+        "waiting room"
+      ]
+    }
+  ]
+}
