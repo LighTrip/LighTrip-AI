@@ -1,20 +1,29 @@
 from __future__ import annotations
 
 import argparse
-import json
-import os
 import sys
-import time
 from pathlib import Path
+from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.dataset.common import labels_by_slug, read_jsonl
-
-
-IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+from scripts.dataset.common import (
+    DEFAULT_PLACES365_DIR,
+    append_jsonl,
+    build_draft_row,
+    configure_gemma_environment,
+    filter_rows_by_labels,
+    generate_text_for_image,
+    guess_content_type,
+    iter_image_files,
+    labels_by_slug,
+    load_generation_runtime,
+    parse_category_filter,
+    read_jsonl,
+    write_jsonl,
+)
 
 CATEGORY_HINTS = {
     "카페": "카페에서 시간을 보내며 음료나 디저트를 즐기는 자연스러운 상황을 떠올려라.",
@@ -27,55 +36,24 @@ CATEGORY_HINTS = {
 }
 
 
-def append_jsonl(path: Path, row: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(row, ensure_ascii=False) + "\n")
-        f.flush()
-
-
-def guess_content_type(path: Path) -> str:
-    suffix = path.suffix.lower()
-
-    if suffix in {".jpg", ".jpeg"}:
-        return "image/jpeg"
-    if suffix == ".png":
-        return "image/png"
-    if suffix == ".webp":
-        return "image/webp"
-
-    return "application/octet-stream"
-
-
-def parse_category_filter(value: str, slug_to_label: dict[str, str]) -> dict[str, str]:
-    if not value.strip():
-        return slug_to_label
-
-    requested = {item.strip() for item in value.split(",") if item.strip()}
-    labels_to_slug = {label: slug for slug, label in slug_to_label.items()}
-
-    selected: dict[str, str] = {}
-
-    for item in requested:
-        if item in slug_to_label:
-            selected[item] = slug_to_label[item]
-        elif item in labels_to_slug:
-            slug = labels_to_slug[item]
-            selected[slug] = item
-        else:
-            allowed = ", ".join([*slug_to_label.keys(), *labels_to_slug.keys()])
-            raise ValueError(f"알 수 없는 카테고리입니다: {item}. 사용 가능: {allowed}")
-
-    return selected
-
-
 def remove_etc_category(slug_to_label: dict[str, str]) -> dict[str, str]:
     return {
         slug: label
         for slug, label in slug_to_label.items()
         if label != "기타"
     }
+
+
+def iter_places365_source_dirs(category_dir: Path) -> list[Path]:
+    if not category_dir.exists():
+        print(f"[WARN] 카테고리 폴더 없음: {category_dir}")
+        return []
+
+    return [
+        source_dir
+        for source_dir in sorted(category_dir.iterdir())
+        if source_dir.is_dir()
+    ]
 
 
 def iter_places365_images(
@@ -87,19 +65,12 @@ def iter_places365_images(
     for slug, label in slug_to_label.items():
         category_dir = input_dir / label
 
-        if not category_dir.exists():
-            print(f"[WARN] 카테고리 폴더 없음: {category_dir}")
-            continue
-
-        for source_dir in sorted(category_dir.iterdir()):
-            if not source_dir.is_dir():
-                continue
-
+        for source_dir in iter_places365_source_dirs(category_dir):
             source_label = source_dir.name
-
-            for path in sorted(source_dir.rglob("*")):
-                if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES:
-                    images.append((path, slug, label, source_label))
+            images.extend(
+                (path, slug, label, source_label)
+                for path in iter_image_files(source_dir)
+            )
 
     return images
 
@@ -128,7 +99,7 @@ def build_dataset_user_prompt(
     return prompt
 
 
-def main() -> None:
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Places365 이미지 폴더를 순회하며 Gemma4 초안을 JSONL로 생성합니다. 기타 카테고리는 제외합니다."
     )
@@ -136,7 +107,7 @@ def main() -> None:
     parser.add_argument(
         "--input-dir",
         type=Path,
-        default=Path("/home/cvlab/Desktop/Yoon/LighTrip-AI/data_places365"),
+        default=DEFAULT_PLACES365_DIR,
     )
     parser.add_argument(
         "--output",
@@ -163,13 +134,11 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
 
-    args = parser.parse_args()
-    args.output.parent.mkdir(parents=True, exist_ok=True)
+    return parser.parse_args()
 
-    print(f"[INFO] output path: {args.output.resolve()}")
 
+def load_places365_categories(args: argparse.Namespace) -> tuple[dict[str, str], set[str]]:
     all_slug_to_label = labels_by_slug(args.config_path)
-
     slug_to_label = parse_category_filter(
         args.categories,
         all_slug_to_label,
@@ -181,83 +150,87 @@ def main() -> None:
             "생성할 카테고리가 없습니다. Places365 스크립트에서는 '기타' 카테고리를 제외합니다."
         )
 
-    if args.overwrite and args.output.exists():
-        args.output.unlink()
-
-    existing_rows = [] if args.overwrite else read_jsonl(args.output)
-
     replace_slug_to_label = parse_category_filter(
         args.replace_categories,
         all_slug_to_label,
     )
     replace_slug_to_label = remove_etc_category(replace_slug_to_label)
-    replace_labels = set(replace_slug_to_label.values())
+    return slug_to_label, set(replace_slug_to_label.values())
+
+
+def prepare_existing_rows(args: argparse.Namespace, replace_labels: set[str]) -> list[dict]:
+    if args.overwrite and args.output.exists():
+        args.output.unlink()
+
+    existing_rows = [] if args.overwrite else read_jsonl(args.output)
+
+    kept_rows = filter_rows_by_labels(existing_rows, replace_labels)
 
     if replace_labels:
-        kept_rows = [
-            row for row in existing_rows
-            if str(row.get("label", "")) not in replace_labels
-        ]
+        write_jsonl(args.output, kept_rows)
 
-        with args.output.open("w", encoding="utf-8") as f:
-            for row in kept_rows:
-                f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    return kept_rows
 
-        existing_rows = kept_rows
 
-    existing_ids = {str(row.get("id")) for row in existing_rows}
-    total_rows = len(existing_rows)
+def build_prompt_from_args(args: argparse.Namespace, label: str) -> str:
+    if args.no_category_hint:
+        return args.user_prompt
 
-    images = iter_places365_images(args.input_dir, slug_to_label)
-    counts: dict[str, int] = {label: 0 for label in slug_to_label.values()}
-
-    if args.dry_run:
-        if not images:
-            print(f"이미지를 찾지 못했습니다: {args.input_dir}")
-            return
-
-        image_path, slug, label, source_label = images[0]
-
-        dataset_prompt = (
-            args.user_prompt
-            if args.no_category_hint
-            else build_dataset_user_prompt(
-                label=label,
-                extra_prompt=args.user_prompt,
-            )
-        )
-
-        print(f"sample_image: {image_path}")
-        print(f"slug: {slug}")
-        print(f"label: {label}")
-        print(f"source_label: {source_label}")
-        print("\nuser_prompt:")
-        print(dataset_prompt or "(empty)")
-        return
-
-    if not args.enable_cuda_graphs:
-        os.environ.setdefault("GGML_CUDA_DISABLE_GRAPHS", "1")
-
-    if not args.full_gpu:
-        os.environ.setdefault("GEMMA_MODEL_FILENAME", "gemma-4-E2B-it-Q4_K_S.gguf")
-        os.environ.setdefault("GEMMA_N_CTX", "1024")
-        os.environ.setdefault("GEMMA_MAX_TOKENS", "64")
-        os.environ.setdefault("GEMMA_N_GPU_LAYERS", str(args.gpu_layers))
-        os.environ.setdefault("GEMMA_OFFLOAD_KQV", "0")
-
-    from app.services.gemma_service import (
-        ALLOWED_IMAGE_TYPES,
-        generate_blog_draft_from_bytes,
-        get_llm,
-        load_model,
+    return build_dataset_user_prompt(
+        label=label,
+        extra_prompt=args.user_prompt,
     )
 
-    load_model(verbose=True)
-    llm = get_llm()
 
-    if llm is None:
-        raise RuntimeError("Gemma4 모델 로드에 실패했습니다.")
+def print_dry_run_sample(
+    args: argparse.Namespace,
+    images: list[tuple[Path, str, str, str]],
+) -> None:
+    if not images:
+        print(f"이미지를 찾지 못했습니다: {args.input_dir}")
+        return
 
+    image_path, slug, label, source_label = images[0]
+    dataset_prompt = build_prompt_from_args(args, label)
+
+    print(f"sample_image: {image_path}")
+    print(f"slug: {slug}")
+    print(f"label: {label}")
+    print(f"source_label: {source_label}")
+    print("\nuser_prompt:")
+    print(dataset_prompt or "(empty)")
+
+
+def try_generate_text_for_image(
+    *,
+    generate_blog_draft_from_bytes: Any,
+    llm: Any,
+    image_path: Path,
+    dataset_prompt: str,
+) -> tuple[str, float] | None:
+    try:
+        return generate_text_for_image(
+            generate_blog_draft_from_bytes=generate_blog_draft_from_bytes,
+            llm=llm,
+            image_path=image_path,
+            dataset_prompt=dataset_prompt,
+        )
+    except Exception as e:
+        print(f"[ERROR] {image_path} 생성 실패: {e}")
+        return None
+
+
+def generate_places365_rows(
+    args: argparse.Namespace,
+    *,
+    images: list[tuple[Path, str, str, str]],
+    existing_ids: set[str],
+    counts: dict[str, int],
+    total_rows: int,
+    allowed_image_types: set[str],
+    generate_blog_draft_from_bytes: Any,
+    llm: Any,
+) -> int:
     for image_path, slug, label, source_label in images:
         if args.limit_total and total_rows >= args.limit_total:
             break
@@ -272,56 +245,35 @@ def main() -> None:
             continue
 
         content_type = guess_content_type(image_path)
-        if content_type not in ALLOWED_IMAGE_TYPES:
+        if content_type not in allowed_image_types:
             continue
 
-        dataset_prompt = (
-            args.user_prompt
-            if args.no_category_hint
-            else build_dataset_user_prompt(
-                label=label,
-                extra_prompt=args.user_prompt,
-            )
+        dataset_prompt = build_prompt_from_args(args, label)
+        generated = try_generate_text_for_image(
+            generate_blog_draft_from_bytes=generate_blog_draft_from_bytes,
+            llm=llm,
+            image_path=image_path,
+            dataset_prompt=dataset_prompt,
         )
-
-        try:
-            started_at = time.perf_counter()
-
-            generated_text = generate_blog_draft_from_bytes(
-                llm=llm,
-                image_bytes=image_path.read_bytes(),
-                filename=image_path.name,
-                user_prompt=dataset_prompt,
-            )
-
-            elapsed = round(time.perf_counter() - started_at, 2)
-
-        except Exception as e:
-            print(f"[ERROR] {image_path} 생성 실패: {e}")
+        if generated is None:
             continue
 
-        row = {
-            "id": row_id,
-            "generated_text": generated_text,
-            "label": label,
-        }
-
-        if args.include_metadata:
-            row.update(
-                {
-                    "image": str(image_path),
-                    "source": "places365",
-                    "source_label": source_label,
-                    "generation_prompt_type": (
-                        "custom" if args.no_category_hint else "category_hint"
-                    ),
-                    "elapsed_seconds": elapsed,
-                    "quality_status": "pending",
-                }
-            )
-
-        if args.include_prompt:
-            row["generation_user_prompt"] = dataset_prompt
+        generated_text, elapsed = generated
+        row = build_draft_row(
+            row_id=row_id,
+            image_path=image_path,
+            generated_text=generated_text,
+            label=label,
+            include_metadata=args.include_metadata,
+            include_prompt=args.include_prompt,
+            dataset_prompt=dataset_prompt,
+            generation_prompt_type=(
+                "custom" if args.no_category_hint else "category_hint"
+            ),
+            source="places365",
+            source_label=source_label,
+            elapsed_seconds=elapsed,
+        )
 
         append_jsonl(args.output, row)
 
@@ -334,6 +286,10 @@ def main() -> None:
             f"({elapsed}s, total_rows={total_rows})"
         )
 
+    return total_rows
+
+
+def print_summary(args: argparse.Namespace, total_rows: int, counts: dict[str, int]) -> None:
     print("\n=== 생성 완료 ===")
     print(f"output: {args.output.resolve()}")
     print(f"total rows: {total_rows}")
@@ -343,6 +299,42 @@ def main() -> None:
         print(f"- {label}: {count}")
 
     print("\n[INFO] Places365 기반 생성에서는 '기타' 카테고리를 제외했습니다.")
+
+
+def main() -> None:
+    args = parse_args()
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    print(f"[INFO] output path: {args.output.resolve()}")
+
+    slug_to_label, replace_labels = load_places365_categories(args)
+    existing_rows = prepare_existing_rows(args, replace_labels)
+    existing_ids = {str(row.get("id")) for row in existing_rows}
+    total_rows = len(existing_rows)
+    images = iter_places365_images(args.input_dir, slug_to_label)
+    counts: dict[str, int] = dict.fromkeys(slug_to_label.values(), 0)
+
+    if args.dry_run:
+        print_dry_run_sample(args, images)
+        return
+
+    configure_gemma_environment(
+        enable_cuda_graphs=args.enable_cuda_graphs,
+        full_gpu=args.full_gpu,
+        gpu_layers=args.gpu_layers,
+        n_ctx=1024,
+    )
+    allowed_image_types, generate_blog_draft_from_bytes, llm = load_generation_runtime()
+    total_rows = generate_places365_rows(
+        args,
+        images=images,
+        existing_ids=existing_ids,
+        counts=counts,
+        total_rows=total_rows,
+        allowed_image_types=allowed_image_types,
+        generate_blog_draft_from_bytes=generate_blog_draft_from_bytes,
+        llm=llm,
+    )
+    print_summary(args, total_rows, counts)
 
 
 if __name__ == "__main__":
