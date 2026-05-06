@@ -30,7 +30,6 @@ LighTrip-AI/
 │   └── main.py
 ├── configs/
 │   ├── dataset_categories.json
-│   ├── draft_prompt.txt
 │   └── places365_categories.json
 ├── data_places365/
 │   ├── 카페/
@@ -94,6 +93,122 @@ Naive Bayes, Logistic Regression, Linear SVM을 동일 데이터셋 기준으로
 | Accuracy | `0.9282 ± 0.0213` |
 
 선정 기준은 Macro F1 평균을 최우선으로 두고, Accuracy 평균, fold별 표준편차, 추론 속도와 학습 시간을 운영 관점의 보조 지표로 함께 고려했습니다.
+
+## API Serving
+
+FastAPI 앱은 기존 Gemma 초안 생성 API와 통합 AI 파이프라인 API를 함께 제공합니다.
+
+### Install
+
+```bash
+pip install -r requirements-api.txt
+```
+
+### Run
+
+모델 파일명, 경로, 추론 파라미터는 GitHub에 올리지 않고 실행 환경에서만 설정합니다.
+아래 환경변수들은 로컬 `.env`, 서버 secret, 또는 shell export로 주입합니다.
+
+Required environment variables:
+
+```text
+GEMMA_MODEL_PATH
+GEMMA_MMPROJ_PATH
+GEMMA_PROMPT_PATH
+GEMMA_N_CTX
+GEMMA_MAX_TOKENS
+GEMMA_TEMPERATURE
+GEMMA_TOP_P
+GEMMA_TOP_K
+GEMMA_REPEAT_PENALTY
+GEMMA_STOP_TOKENS
+GEMMA_N_GPU_LAYERS
+GEMMA_MAIN_GPU
+GEMMA_OFFLOAD_KQV
+GEMMA_MMPROJ_USE_GPU
+CATEGORY_ARTIFACT_PATH
+CATEGORY_UNKNOWN_LABEL
+```
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+### Endpoints
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/health` | Gemma 모델과 카테고리 분류 모델 로드 상태 확인 |
+| `POST` | `/gemma/generate` | 이미지 기반 블로그 초안 생성 |
+| `POST` | `/pipeline/generate-and-classify` | 이미지 기반 블로그 초안 생성 후 TF-IDF + Linear SVM 카테고리 분류 |
+
+### Pipeline Request
+
+`multipart/form-data` 형식으로 요청합니다.
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `image` | file | Yes | `jpg`, `png`, `webp` 이미지 |
+| `prompt` | string | No | 초안 생성에 반영할 사용자 요청 |
+| `unknown_threshold` | float | No | 확률 지원 모델에서 낮은 confidence를 `기타`로 처리할 기준값 |
+
+```bash
+curl -X POST "http://localhost:8000/pipeline/generate-and-classify" \
+  -F "image=@sample.jpg" \
+  -F "prompt=따뜻한 일상 기록 느낌으로 작성해줘"
+```
+
+디버그 정보가 필요할 때는 쿼리 파라미터로 `debug=true`를 추가합니다.
+
+```bash
+curl -X POST "http://localhost:8000/pipeline/generate-and-classify?debug=true" \
+  -F "image=@sample.jpg" \
+  -F "prompt=따뜻한 일상 기록 느낌으로 작성해줘"
+```
+
+### Pipeline Response
+
+기본 응답은 서비스 연동에 필요한 초안과 카테고리만 반환합니다.
+
+```json
+{
+  "success": true,
+  "data": {
+    "generated_text": "오늘은 커피 향이 유난히 좋았다.\n잠깐 쉬어가는 시간이 이렇게 반가울 줄 몰랐다.",
+    "category": "카페"
+  }
+}
+```
+
+`debug=true`일 때만 분류 score, 모델명, 처리 시간 등의 진단 정보를 함께 반환합니다.
+
+```json
+{
+  "success": true,
+  "data": {
+    "generated_text": "오늘은 커피 향이 유난히 좋았다.\n잠깐 쉬어가는 시간이 이렇게 반가울 줄 몰랐다.",
+    "category": "카페"
+  },
+  "debug": {
+    "category": {
+      "label": "카페",
+      "raw_label": "카페",
+      "confidence": null,
+      "score": 0.5363,
+      "scores": {
+        "카페": 0.5363,
+        "식당": -1.0874
+      },
+      "model": "linear_svm"
+    },
+    "filename": "sample.jpg",
+    "prompt": "따뜻한 일상 기록 느낌으로 작성해줘",
+    "elapsed_seconds": 3.42
+  }
+}
+```
+
+Linear SVM은 `predict_proba`를 제공하지 않기 때문에 `confidence`는 `null`이며, 대신 `decision_function` 기반 `score`와 `scores`를 반환합니다.
 
 ## Places365 Draft Dataset Pipeline
 
