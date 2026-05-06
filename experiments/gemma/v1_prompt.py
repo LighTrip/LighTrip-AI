@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import base64
 import mimetypes
+import os
 import re
 import time
 from pathlib import Path
@@ -12,19 +15,58 @@ from llama_cpp.llama_chat_format import Llava15ChatHandler, suppress_stdout_stde
 
 BASE_DIR: Final[Path] = Path(__file__).resolve().parent
 PROJECT_ROOT: Final[Path] = BASE_DIR.parent.parent
-MODEL_DIR: Final[Path] = PROJECT_ROOT / "models"
 
-MODEL_PATH: Final[str] = str(MODEL_DIR / "gemma-4-E2B-it-Q4_K_M.gguf")
-MMPROJ_PATH: Final[str] = str(MODEL_DIR / "mmproj-F16.gguf")
-IMAGE_PATH: Final[str] = str(BASE_DIR / "images" / "running.jpg")
 
-N_CTX: Final[int] = 1024
-MAX_TOKENS: Final[int] = 64
-TEMPERATURE: Final[float] = 1.0
-TOP_P: Final[float] = 0.95
-TOP_K: Final[int] = 64
-REPEAT_PENALTY: Final[float] = 1.2
-STOP_TOKENS: Final[list[str]] = ["<end_of_turn>"]
+def required_env(name: str) -> str:
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        raise RuntimeError(f"필수 환경변수가 설정되지 않았습니다: {name}")
+    return value.strip()
+
+
+def required_path_env(name: str) -> str:
+    path = Path(required_env(name))
+    if path.is_absolute():
+        return str(path)
+    return str(PROJECT_ROOT / path)
+
+
+def required_int_env(name: str) -> int:
+    return int(required_env(name))
+
+
+def required_float_env(name: str) -> float:
+    return float(required_env(name))
+
+
+def required_bool_env(name: str) -> bool:
+    return required_env(name).lower() in {"1", "true", "yes", "on"}
+
+
+def required_list_env(name: str) -> list[str]:
+    return [
+        item.strip()
+        for item in required_env(name).split(",")
+        if item.strip()
+    ]
+
+
+MODEL_PATH: Final[str] = required_path_env("GEMMA_MODEL_PATH")
+MMPROJ_PATH: Final[str] = required_path_env("GEMMA_MMPROJ_PATH")
+IMAGE_PATH: Final[str] = required_path_env("GEMMA_SAMPLE_IMAGE_PATH")
+PROMPT_PATH: Final[str] = required_path_env("GEMMA_PROMPT_PATH")
+
+N_CTX: Final[int] = required_int_env("GEMMA_N_CTX")
+MAX_TOKENS: Final[int] = required_int_env("GEMMA_MAX_TOKENS")
+TEMPERATURE: Final[float] = required_float_env("GEMMA_TEMPERATURE")
+TOP_P: Final[float] = required_float_env("GEMMA_TOP_P")
+TOP_K: Final[int] = required_int_env("GEMMA_TOP_K")
+REPEAT_PENALTY: Final[float] = required_float_env("GEMMA_REPEAT_PENALTY")
+STOP_TOKENS: Final[list[str]] = required_list_env("GEMMA_STOP_TOKENS")
+N_GPU_LAYERS: Final[int] = required_int_env("GEMMA_N_GPU_LAYERS")
+MAIN_GPU: Final[int] = required_int_env("GEMMA_MAIN_GPU")
+OFFLOAD_KQV: Final[bool] = required_bool_env("GEMMA_OFFLOAD_KQV")
+MMPROJ_USE_GPU: Final[bool] = required_bool_env("GEMMA_MMPROJ_USE_GPU")
 
 
 def dedupe_sentences(text: str) -> str:
@@ -54,18 +96,15 @@ def image_to_data_uri(image_path: str) -> str:
 
 
 def build_prompt() -> str:
-    """블로그 초안 생성을 위한 사용자 프롬프트를 반환한다."""
-    return (
-        "너는 사용자가 사진과 함께 올릴 짧은 블로그 글 초안을 대신 작성하는 한국어 작가다.\n"
-        "중요: 이미지 내용을 설명하는 해설문을 쓰지 마라.\n"
-        "중요: 사용자가 자신의 순간을 기록하듯 자연스럽게 써라.\n"
-        "중요: '이 사진은', '사진에는', '보인다', '배경에는' 같은 표현은 절대 사용하지 마라.\n"
-        "반드시 한국어로만 작성하고, 정확히 2줄만 출력해라.\n"
-        "각 줄은 실제 블로그나 SNS에 올릴 법한 자연스러운 초안이어야 한다.\n"
-        "너무 분석적이거나 객관적인 묘사는 피하고, 일상 기록처럼 부드럽게 작성해라.\n"
-        "제목, 번호, 기호, 따옴표 없이 결과만 출력해라.\n\n"
-        "이 사진을 바탕으로 사용자가 직접 작성한 것 같은 블로그 초안 2줄을 작성해줘."
-    )
+    """로컬 프롬프트 파일에서 사용자 프롬프트를 읽는다."""
+    prompt_path = Path(PROMPT_PATH)
+    if not prompt_path.exists():
+        raise FileNotFoundError(f"프롬프트 파일을 찾을 수 없습니다: {PROMPT_PATH}")
+
+    prompt = prompt_path.read_text(encoding="utf-8").strip()
+    if not prompt:
+        raise ValueError("프롬프트 파일이 비어 있습니다.")
+    return prompt
 
 
 class Gemma4VisionChatHandler(Llava15ChatHandler):
@@ -107,7 +146,7 @@ class Gemma4VisionChatHandler(Llava15ChatHandler):
 
         with suppress_stdout_stderr(disable=self.verbose):
             ctx_params = self._mtmd_cpp.mtmd_context_params_default()
-            ctx_params.use_gpu = True
+            ctx_params.use_gpu = MMPROJ_USE_GPU
             ctx_params.print_timings = self.verbose
             ctx_params.n_threads = llama_model.n_threads
             ctx_params.flash_attn_type = llama_cpp.LLAMA_FLASH_ATTN_TYPE_DISABLED
@@ -153,9 +192,9 @@ def create_llm(
         model_path=model_path,
         chat_handler=chat_handler,
         n_ctx=N_CTX,
-        n_gpu_layers=-1,
-        offload_kqv=True,
-        main_gpu=0,
+        n_gpu_layers=N_GPU_LAYERS,
+        offload_kqv=OFFLOAD_KQV,
+        main_gpu=MAIN_GPU,
         verbose=verbose,
     )
 
