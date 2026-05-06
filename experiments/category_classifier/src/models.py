@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 from functools import partial
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,13 @@ from sklearn.pipeline import Pipeline
 from sklearn.svm import LinearSVC
 
 from experiments.category_classifier.src.preprocess import load_stopwords, tokenize_ko
+
+SUPPORTED_MODELS = ("nb", "logistic_regression", "linear_svm")
+MODEL_DISPLAY_NAMES = {
+    "nb": "Naive Bayes",
+    "logistic_regression": "Logistic Regression",
+    "linear_svm": "Linear SVM",
+}
 
 
 def build_tfidf_vectorizer(
@@ -169,3 +177,68 @@ def build_pipeline(model_name: str, **kwargs: Any) -> Pipeline:
             class_weight=kwargs.get("class_weight"),
         )
     raise ValueError(f"지원하지 않는 모델입니다: {model_name}")
+
+
+def add_single_model_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--model",
+        default="linear_svm",
+        choices=SUPPORTED_MODELS,
+    )
+
+
+def add_multi_model_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--models",
+        nargs="+",
+        default=list(SUPPORTED_MODELS),
+        choices=SUPPORTED_MODELS,
+    )
+
+
+def add_model_hyperparameter_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--max-features", type=int, default=20000)
+    parser.add_argument("--min-df", type=int, default=1)
+    parser.add_argument("--max-df", type=float, default=0.95)
+    parser.add_argument("--ngram-max", type=int, default=2)
+    parser.add_argument("--alpha", type=float, default=1.0)
+    parser.add_argument(
+        "--c",
+        type=float,
+        default=1.0,
+        help="Logistic Regression/Linear SVM regularization strength inverse.",
+    )
+    parser.add_argument(
+        "--max-iter",
+        type=int,
+        default=1000,
+        help="Logistic Regression/Linear SVM 최대 반복 횟수입니다.",
+    )
+    parser.add_argument("--solver", default="lbfgs", help="Logistic Regression solver입니다.")
+    parser.add_argument(
+        "--class-weight",
+        choices=["balanced"],
+        help="Logistic Regression/Linear SVM class_weight 옵션입니다.",
+    )
+
+
+def model_params_from_args(args: argparse.Namespace) -> dict[str, Any]:
+    return {
+        "max_features": args.max_features,
+        "min_df": args.min_df,
+        "max_df": args.max_df,
+        "ngram_max": args.ngram_max,
+        "alpha": args.alpha,
+        "c": args.c,
+        "max_iter": args.max_iter,
+        "solver": args.solver,
+        "class_weight": args.class_weight,
+    }
+
+
+def build_pipeline_from_args(args: argparse.Namespace, model_name: str) -> Pipeline:
+    return build_pipeline(
+        model_name,
+        stopwords_path=args.stopwords,
+        **model_params_from_args(args),
+    )

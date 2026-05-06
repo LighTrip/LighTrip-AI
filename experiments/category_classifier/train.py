@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import joblib
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+try:
+    from _bootstrap import bootstrap_project_root
+except ModuleNotFoundError:
+    from experiments.category_classifier._bootstrap import bootstrap_project_root
+
+bootstrap_project_root()
 
 from experiments.category_classifier.src.data import load_text_label_dataset
 from experiments.category_classifier.src.evaluate import (
@@ -20,18 +22,19 @@ from experiments.category_classifier.src.evaluate import (
     save_confusion_matrix,
     save_metrics,
 )
-from experiments.category_classifier.src.models import build_pipeline
+from experiments.category_classifier.src.models import (
+    add_model_hyperparameter_arguments,
+    add_single_model_argument,
+    build_pipeline_from_args,
+    model_params_from_args,
+)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="TF-IDF 기반 카테고리 분류 모델을 학습합니다."
     )
-    parser.add_argument(
-        "--model",
-        default="linear_svm",
-        choices=["nb", "logistic_regression", "linear_svm"],
-    )
+    add_single_model_argument(parser)
     parser.add_argument(
         "--train",
         type=Path,
@@ -64,29 +67,7 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=Path("experiments/category_classifier/reports"),
     )
-    parser.add_argument("--max-features", type=int, default=20000)
-    parser.add_argument("--min-df", type=int, default=1)
-    parser.add_argument("--max-df", type=float, default=0.95)
-    parser.add_argument("--ngram-max", type=int, default=2)
-    parser.add_argument("--alpha", type=float, default=1.0)
-    parser.add_argument(
-        "--c",
-        type=float,
-        default=1.0,
-        help="Logistic Regression/Linear SVM regularization strength inverse.",
-    )
-    parser.add_argument(
-        "--max-iter",
-        type=int,
-        default=1000,
-        help="Logistic Regression/Linear SVM 최대 반복 횟수입니다.",
-    )
-    parser.add_argument("--solver", default="lbfgs", help="Logistic Regression solver입니다.")
-    parser.add_argument(
-        "--class-weight",
-        choices=["balanced"],
-        help="Logistic Regression/Linear SVM class_weight 옵션입니다.",
-    )
+    add_model_hyperparameter_arguments(parser)
     return parser.parse_args()
 
 
@@ -135,19 +116,8 @@ def main() -> None:
     )
 
     labels = sorted(set(train_labels) | set(valid_labels) | set(test_labels))
-    pipeline = build_pipeline(
-        args.model,
-        stopwords_path=args.stopwords,
-        max_features=args.max_features,
-        min_df=args.min_df,
-        max_df=args.max_df,
-        ngram_max=args.ngram_max,
-        alpha=args.alpha,
-        c=args.c,
-        max_iter=args.max_iter,
-        solver=args.solver,
-        class_weight=args.class_weight,
-    )
+    model_params = model_params_from_args(args)
+    pipeline = build_pipeline_from_args(args, args.model)
     pipeline.fit(train_texts, train_labels)
 
     args.artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -167,17 +137,7 @@ def main() -> None:
             "valid_size": len(valid_texts),
             "test_size": len(test_texts),
         },
-        "params": {
-            "max_features": args.max_features,
-            "min_df": args.min_df,
-            "max_df": args.max_df,
-            "ngram_max": args.ngram_max,
-            "alpha": args.alpha,
-            "c": args.c,
-            "max_iter": args.max_iter,
-            "solver": args.solver,
-            "class_weight": args.class_weight,
-        },
+        "params": model_params,
         "valid": split_metrics(
             args.model,
             "valid",
@@ -205,7 +165,7 @@ def main() -> None:
                 "labels": labels,
                 "text_field": args.text_field,
                 "label_field": args.label_field,
-                "params": metrics["params"],
+                "params": model_params,
             },
         },
         artifact_path,

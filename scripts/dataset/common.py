@@ -1,18 +1,28 @@
 from __future__ import annotations
 
+import argparse
 import csv
 import hashlib
 import json
 import os
 import time
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "configs" / "dataset_categories.json"
 DEFAULT_PLACES365_DIR = PROJECT_ROOT / "data_places365"
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+
+
+@dataclass(frozen=True)
+class DraftImage:
+    path: Path
+    slug: str
+    label: str
+    source_label: str = ""
 
 
 def load_categories(config_path: Path = DEFAULT_CONFIG_PATH) -> list[dict[str, Any]]:
@@ -286,6 +296,193 @@ def write_split_outputs(
         write_csv(output_dir / "train.csv", train)
         write_csv(output_dir / "valid.csv", valid)
         write_csv(output_dir / "test.csv", test)
+
+
+def add_split_arguments(
+    parser: argparse.ArgumentParser,
+    *,
+    default_input: Path,
+    default_output_dir: Path,
+) -> None:
+    parser.add_argument("--input", type=Path, default=default_input)
+    parser.add_argument("--output-dir", type=Path, default=default_output_dir)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--valid-ratio", type=float, default=0.1)
+    parser.add_argument("--test-ratio", type=float, default=0.1)
+    parser.add_argument("--csv", action="store_true")
+
+
+def run_split_cli(
+    *,
+    description: str,
+    default_input: Path,
+    default_output_dir: Path,
+) -> None:
+    parser = argparse.ArgumentParser(description=description)
+    add_split_arguments(
+        parser,
+        default_input=default_input,
+        default_output_dir=default_output_dir,
+    )
+    args = parser.parse_args()
+
+    train, valid, test = stratified_split(
+        read_jsonl(args.input),
+        seed=args.seed,
+        valid_ratio=args.valid_ratio,
+        test_ratio=args.test_ratio,
+    )
+    write_split_outputs(
+        output_dir=args.output_dir,
+        train=train,
+        valid=valid,
+        test=test,
+        include_csv=args.csv,
+    )
+
+    print(f"train: {len(train)}")
+    print(f"valid: {len(valid)}")
+    print(f"test: {len(test)}")
+
+
+def run_open_images_split_cli() -> None:
+    run_split_cli(
+        description="검증된 JSONL을 train/valid/test로 계층 분할합니다.",
+        default_input=Path("data/processed/accepted_drafts.jsonl"),
+        default_output_dir=Path("data/processed"),
+    )
+
+
+def run_places365_split_cli() -> None:
+    run_split_cli(
+        description="검증된 JSONL을 train/valid/test로 계층 분할합니다.",
+        default_input=Path("data_places365/interim/places365_generated_drafts.jsonl"),
+        default_output_dir=Path("data_places365/processed"),
+    )
+
+
+def add_generation_arguments(
+    parser: argparse.ArgumentParser,
+    *,
+    default_input_dir: Path,
+    default_output: Path,
+    default_config_path: Path = Path("configs/dataset_categories.json"),
+    default_gpu_layers: int,
+) -> None:
+    parser.add_argument("--input-dir", type=Path, default=default_input_dir)
+    parser.add_argument("--output", type=Path, default=default_output)
+    parser.add_argument("--config-path", type=Path, default=default_config_path)
+    parser.add_argument("--limit-per-category", type=int, default=0)
+    parser.add_argument("--limit-total", type=int, default=0)
+    parser.add_argument("--categories", default="")
+    parser.add_argument("--replace-categories", default="")
+    parser.add_argument("--user-prompt", default="")
+    parser.add_argument("--no-category-hint", action="store_true")
+    parser.add_argument("--include-metadata", action="store_true")
+    parser.add_argument("--include-prompt", action="store_true")
+    parser.add_argument("--enable-cuda-graphs", action="store_true")
+    parser.add_argument("--full-gpu", action="store_true")
+    parser.add_argument("--gpu-layers", type=int, default=default_gpu_layers)
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--overwrite", action="store_true")
+
+
+def load_generation_categories(
+    args: argparse.Namespace,
+    *,
+    transform: Callable[[dict[str, str]], dict[str, str]] | None = None,
+) -> tuple[dict[str, str], set[str]]:
+    all_slug_to_label = labels_by_slug(args.config_path)
+    slug_to_label = parse_category_filter(args.categories, all_slug_to_label)
+    replace_slug_to_label = parse_category_filter(
+        args.replace_categories,
+        all_slug_to_label,
+    )
+
+    if transform is not None:
+        slug_to_label = transform(slug_to_label)
+        replace_slug_to_label = transform(replace_slug_to_label)
+
+    return slug_to_label, set(replace_slug_to_label.values())
+
+
+def load_generation_rows(
+    *,
+    output: Path,
+    overwrite: bool,
+    replace_labels: set[str],
+    rewrite_when_replaced: bool,
+) -> list[dict[str, Any]]:
+    if overwrite:
+        if output.exists():
+            output.unlink()
+        return []
+
+    existing_rows = read_jsonl(output)
+    kept_rows = filter_rows_by_labels(existing_rows, replace_labels)
+    if rewrite_when_replaced and replace_labels:
+        write_jsonl(output, kept_rows)
+    return kept_rows
+
+
+def generation_prompt_type(args: argparse.Namespace) -> str:
+    return "custom" if args.no_category_hint else "category_hint"
+
+
+def build_generated_draft_row(
+    args: argparse.Namespace,
+    *,
+    image: DraftImage,
+    row_id: str,
+    generated_text: str,
+    dataset_prompt: str,
+    source: str,
+    elapsed_seconds: float,
+    include_image: bool = False,
+    source_label: str | None = None,
+) -> dict[str, Any]:
+    return build_draft_row(
+        row_id=row_id,
+        image_path=image.path,
+        generated_text=generated_text,
+        label=image.label,
+        include_image=include_image,
+        include_metadata=args.include_metadata,
+        include_prompt=args.include_prompt,
+        dataset_prompt=dataset_prompt,
+        generation_prompt_type=generation_prompt_type(args),
+        source=source,
+        source_label=image.source_label if source_label is None else source_label,
+        elapsed_seconds=elapsed_seconds,
+    )
+
+
+def record_generated_draft(
+    *,
+    existing_ids: set[str],
+    counts: dict[str, int],
+    image: DraftImage,
+    row_id: str,
+) -> None:
+    existing_ids.add(row_id)
+    counts[image.label] += 1
+
+
+def should_skip_draft_image(
+    *,
+    args: argparse.Namespace,
+    image: DraftImage,
+    row_id: str,
+    existing_ids: set[str],
+    counts: dict[str, int],
+    allowed_image_types: set[str],
+) -> bool:
+    if args.limit_per_category and counts[image.label] >= args.limit_per_category:
+        return True
+    if row_id in existing_ids:
+        counts[image.label] += 1
+        return True
+    return guess_content_type(image.path) not in allowed_image_types
 
 
 def remove_tree_inside_root(path: Path, root: Path) -> None:
