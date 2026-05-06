@@ -149,11 +149,8 @@ def configure_gemma_environment(
         os.environ.setdefault("GGML_CUDA_DISABLE_GRAPHS", "1")
 
     if not full_gpu:
-        os.environ.setdefault("GEMMA_MODEL_FILENAME", "gemma-4-E2B-it-Q4_K_S.gguf")
         os.environ.setdefault("GEMMA_N_CTX", str(n_ctx))
-        os.environ.setdefault("GEMMA_MAX_TOKENS", "64")
         os.environ.setdefault("GEMMA_N_GPU_LAYERS", str(gpu_layers))
-        os.environ.setdefault("GEMMA_OFFLOAD_KQV", "0")
 
 
 def load_generation_runtime() -> tuple[set[str], Any, Any]:
