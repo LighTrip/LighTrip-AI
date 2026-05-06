@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import sys
 import time
 from collections import Counter
 from datetime import datetime
@@ -19,20 +18,22 @@ import numpy as np
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.model_selection import StratifiedKFold
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+try:
+    from _bootstrap import bootstrap_project_root
+except ModuleNotFoundError:
+    from experiments.category_classifier._bootstrap import bootstrap_project_root
+
+bootstrap_project_root()
 
 from experiments.category_classifier.src.data import load_text_label_dataset
 from experiments.category_classifier.src.evaluate import evaluate_predictions
-from experiments.category_classifier.src.models import build_pipeline
-
-SUPPORTED_MODELS = ("nb", "logistic_regression", "linear_svm")
-MODEL_DISPLAY_NAMES = {
-    "nb": "Naive Bayes",
-    "logistic_regression": "Logistic Regression",
-    "linear_svm": "Linear SVM",
-}
+from experiments.category_classifier.src.models import (
+    MODEL_DISPLAY_NAMES,
+    add_model_hyperparameter_arguments,
+    add_multi_model_argument,
+    build_pipeline_from_args,
+    model_params_from_args,
+)
 METRIC_KEYS = ("accuracy", "f1_macro")
 
 
@@ -53,12 +54,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--text-field", default="generated_text")
     parser.add_argument("--label-field", default="label")
-    parser.add_argument(
-        "--models",
-        nargs="+",
-        default=list(SUPPORTED_MODELS),
-        choices=SUPPORTED_MODELS,
-    )
+    add_multi_model_argument(parser)
     parser.add_argument(
         "--stopwords",
         type=Path,
@@ -71,29 +67,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--folds", type=int, default=5)
     parser.add_argument("--random-state", type=int, default=42)
-    parser.add_argument("--max-features", type=int, default=20000)
-    parser.add_argument("--min-df", type=int, default=1)
-    parser.add_argument("--max-df", type=float, default=0.95)
-    parser.add_argument("--ngram-max", type=int, default=2)
-    parser.add_argument("--alpha", type=float, default=1.0)
-    parser.add_argument(
-        "--c",
-        type=float,
-        default=1.0,
-        help="Logistic Regression/Linear SVM regularization strength inverse.",
-    )
-    parser.add_argument(
-        "--max-iter",
-        type=int,
-        default=1000,
-        help="Logistic Regression/Linear SVM 최대 반복 횟수입니다.",
-    )
-    parser.add_argument("--solver", default="lbfgs", help="Logistic Regression solver입니다.")
-    parser.add_argument(
-        "--class-weight",
-        choices=["balanced"],
-        help="Logistic Regression/Linear SVM class_weight 옵션입니다.",
-    )
+    add_model_hyperparameter_arguments(parser)
     return parser.parse_args()
 
 
@@ -134,19 +108,7 @@ def load_cv_dataset(
 
 
 def build_model(args: argparse.Namespace, model_name: str):
-    return build_pipeline(
-        model_name,
-        stopwords_path=args.stopwords,
-        max_features=args.max_features,
-        min_df=args.min_df,
-        max_df=args.max_df,
-        ngram_max=args.ngram_max,
-        alpha=args.alpha,
-        c=args.c,
-        max_iter=args.max_iter,
-        solver=args.solver,
-        class_weight=args.class_weight,
-    )
+    return build_pipeline_from_args(args, model_name)
 
 
 def summarize_folds(folds: list[dict[str, Any]]) -> dict[str, Any]:
@@ -684,17 +646,7 @@ def main() -> None:
         "random_state": args.random_state,
         "labels": target_labels,
         "dataset": dataset,
-        "params": {
-            "max_features": args.max_features,
-            "min_df": args.min_df,
-            "max_df": args.max_df,
-            "ngram_max": args.ngram_max,
-            "alpha": args.alpha,
-            "c": args.c,
-            "max_iter": args.max_iter,
-            "solver": args.solver,
-            "class_weight": args.class_weight,
-        },
+        "params": model_params_from_args(args),
         "selected_model": selected["model"],
         "models": [
             {key: value for key, value in result.items() if key not in {"oof_true", "oof_pred"}}
