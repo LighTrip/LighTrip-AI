@@ -14,57 +14,24 @@ from llama_cpp.llama_chat_format import Llava15ChatHandler, suppress_stdout_stde
 
 BASE_DIR: Final[Path] = Path(__file__).resolve().parent
 PROJECT_ROOT: Final[Path] = BASE_DIR.parent.parent
+MODEL_DIR: Final[Path] = PROJECT_ROOT / "models"
 
+MODEL_FILENAME: Final[str] = os.getenv("GEMMA_MODEL_FILENAME", "gemma-4-E2B-it-Q4_K_M.gguf")
+MMPROJ_FILENAME: Final[str] = os.getenv("GEMMA_MMPROJ_FILENAME", "mmproj-F16.gguf")
+MODEL_PATH: Final[str] = str(MODEL_DIR / MODEL_FILENAME)
+MMPROJ_PATH: Final[str] = str(MODEL_DIR / MMPROJ_FILENAME)
 
-def required_env(name: str) -> str:
-    value = os.getenv(name)
-    if value is None or not value.strip():
-        raise RuntimeError(f"필수 환경변수가 설정되지 않았습니다: {name}")
-    return value.strip()
-
-
-def required_int_env(name: str) -> int:
-    return int(required_env(name))
-
-
-def required_float_env(name: str) -> float:
-    return float(required_env(name))
-
-
-def required_bool_env(name: str) -> bool:
-    return required_env(name).lower() in {"1", "true", "yes", "on"}
-
-
-def required_list_env(name: str) -> list[str]:
-    return [
-        item.strip()
-        for item in required_env(name).split(",")
-        if item.strip()
-    ]
-
-
-def required_path_env(name: str) -> str:
-    path = Path(required_env(name))
-    if path.is_absolute():
-        return str(path)
-    return str(PROJECT_ROOT / path)
-
-
-MODEL_PATH: Final[str] = required_path_env("GEMMA_MODEL_PATH")
-MMPROJ_PATH: Final[str] = required_path_env("GEMMA_MMPROJ_PATH")
-PROMPT_PATH: Final[str] = required_path_env("GEMMA_PROMPT_PATH")
-
-N_CTX: Final[int] = required_int_env("GEMMA_N_CTX")
-MAX_TOKENS: Final[int] = required_int_env("GEMMA_MAX_TOKENS")
-TEMPERATURE: Final[float] = required_float_env("GEMMA_TEMPERATURE")
-TOP_P: Final[float] = required_float_env("GEMMA_TOP_P")
-TOP_K: Final[int] = required_int_env("GEMMA_TOP_K")
-REPEAT_PENALTY: Final[float] = required_float_env("GEMMA_REPEAT_PENALTY")
-STOP_TOKENS: Final[list[str]] = required_list_env("GEMMA_STOP_TOKENS")
-N_GPU_LAYERS: Final[int] = required_int_env("GEMMA_N_GPU_LAYERS")
-MAIN_GPU: Final[int] = required_int_env("GEMMA_MAIN_GPU")
-OFFLOAD_KQV: Final[bool] = required_bool_env("GEMMA_OFFLOAD_KQV")
-MMPROJ_USE_GPU: Final[bool] = required_bool_env("GEMMA_MMPROJ_USE_GPU")
+N_CTX: Final[int] = int(os.getenv("GEMMA_N_CTX", "1024"))
+MAX_TOKENS: Final[int] = int(os.getenv("GEMMA_MAX_TOKENS", "128"))
+TEMPERATURE: Final[float] = 1.0
+TOP_P: Final[float] = 0.95
+TOP_K: Final[int] = 64
+REPEAT_PENALTY: Final[float] = 1.2
+STOP_TOKENS: Final[list[str]] = ["<end_of_turn>"]
+N_GPU_LAYERS: Final[int] = int(os.getenv("GEMMA_N_GPU_LAYERS", "-1"))
+MAIN_GPU: Final[int] = int(os.getenv("GEMMA_MAIN_GPU", "0"))
+OFFLOAD_KQV: Final[bool] = os.getenv("GEMMA_OFFLOAD_KQV", "1") != "0"
+MMPROJ_USE_GPU: Final[bool] = os.getenv("GEMMA_MMPROJ_USE_GPU", "1") != "0"
 
 ALLOWED_IMAGE_TYPES: Final[set[str]] = {
     "image/jpeg",
@@ -109,26 +76,23 @@ def image_bytes_to_data_uri(image_bytes: bytes, filename: str = "upload.jpg") ->
     return f"data:{mime_type};base64,{encoded}"
 
 
-def load_prompt_template(prompt_path: str = PROMPT_PATH) -> str:
-    path = Path(prompt_path)
-    if not path.exists():
-        raise FileNotFoundError(f"프롬프트 파일을 찾을 수 없습니다: {prompt_path}")
-
-    prompt_template = path.read_text(encoding="utf-8").strip()
-    if not prompt_template:
-        raise ValueError("프롬프트 파일이 비어 있습니다.")
-    return prompt_template
-
-
 def build_prompt(user_prompt: str | None = None) -> str:
-    prompt_template = load_prompt_template()
-    safe_user_prompt = user_prompt.strip() if user_prompt else ""
+    base_prompt = (
+        "너는 사용자가 사진과 함께 올릴 짧은 블로그 글 초안을 대신 작성하는 한국어 작가다.\n"
+        "중요: 이미지 내용을 설명하는 해설문을 쓰지 마라.\n"
+        "중요: 사용자가 자신의 순간을 기록하듯 자연스럽게 써라.\n"
+        "중요: '이 사진은', '사진에는', '보인다', '배경에는' 같은 표현은 절대 사용하지 마라.\n"
+        "반드시 한국어로만 작성하고, 정확히 2줄만 출력해라.\n"
+        "각 줄은 실제 블로그나 SNS에 올릴 법한 자연스러운 초안이어야 한다.\n"
+        "너무 분석적이거나 객관적인 묘사는 피하고, 일상 기록처럼 부드럽게 작성해라.\n"
+        "제목, 번호, 기호, 따옴표 없이 결과만 출력해라.\n"
+    )
 
-    if "{user_prompt}" in prompt_template:
-        return prompt_template.replace("{user_prompt}", safe_user_prompt)
-    if safe_user_prompt:
-        return f"{prompt_template}\n\n{safe_user_prompt}"
-    return prompt_template
+    if user_prompt and user_prompt.strip():
+        base_prompt += f"\n사용자 요청:\n{user_prompt.strip()}\n"
+
+    base_prompt += "\n이 사진을 바탕으로 사용자가 직접 작성한 것 같은 블로그 초안 2줄을 작성해줘."
+    return base_prompt
 
 
 class Gemma4VisionChatHandler(Llava15ChatHandler):
