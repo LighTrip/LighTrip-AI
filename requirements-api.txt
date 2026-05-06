@@ -1,6 +1,0 @@
-fastapi
-uvicorn
-python-multipart
-llama-cpp-python
-scikit-learn
-joblib
