@@ -1,18 +1,34 @@
-# 🔥 모델 파일 (절대 올리면 안 됨)
+# 모델 파일
 *.gguf
 models/
 
-# 🔥 이미지 (실험용)
+# 실험용 이미지
 experiments/**/images/
 
-# 🔥 로그 / 결과 파일
+# 로그 / 결과 파일
 *.log
 *.txt
+!configs/draft_prompt.txt
+!requirements-dataset.txt
+!requirements-classifier.txt
+!experiments/category_classifier/stopwords_ko.txt
 outputs/
+experiments/category_classifier/artifacts/
+experiments/category_classifier/reports/
 
-# 🔥 Python
+# 데이터셋 원천/생성물
+data/raw/
+data/images/
+data/interim/
+data/processed/
+data_places365/images/
+data_places365/interim/
+data_places365/processed/
+data_places365/reports/
+
+# Python
 __pycache__/
 *.pyc
 
-# 🔥 환경파일
+# 환경파일
 .env

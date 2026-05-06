@@ -1,0 +1,3 @@
+fiftyone
+datasets
+Pillow>=9.0.1

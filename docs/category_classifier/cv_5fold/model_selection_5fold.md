@@ -1,0 +1,99 @@
+# 카테고리 분류 모델 5-fold 교차 검증 결과
+
+## 결론 요약
+
+최종 적용 모델은 **Linear SVM**입니다.
+
+- 핵심 지표인 Macro F1 평균이 0.9281로 가장 높았습니다.
+- Accuracy 평균도 0.9282로 가장 높아 전체 정답률 기준에서도 우위가 확인됐습니다.
+- 가장 낮은 fold Macro F1도 0.8998로, 모든 fold에서 서비스 적용 가능한 수준의 성능을 유지했습니다.
+
+## 실험 설정
+
+- 생성 시각: 2026-05-05T02:19:04
+- 평가 데이터셋: 2549개 (공원 350, 문화 449, 쇼핑 250, 술집 250, 식당 300, 운동 500, 카페 450)
+- 교차 검증: StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+- 비교 모델: Naive Bayes, Logistic Regression, Linear SVM
+- 텍스트 표현: TF-IDF unigram/bigram
+- 추론 시간: 동일 실행 환경에서 fold별 validation split 예측 시간을 기준으로 측정한 참고 지표
+
+## 최종 선정 기준
+
+1. **Macro F1 평균을 최우선 지표로 판단**했습니다. 라벨별 성능 균형이 서비스 품질에 직접 영향을 주기 때문입니다.
+2. **Accuracy 평균은 보조 지표로 확인**했습니다. 전체 정답률이 높은 모델인지 함께 검증했습니다.
+3. **표준편차는 안정성 판단 지표로 사용**했습니다. fold별 성능 변동이 큰 모델은 운영 리스크가 커질 수 있습니다.
+4. **추론 속도와 학습 시간은 운영 판단 보조 지표로 사용**했습니다. 모델 배포, 재학습, API 응답 비용을 함께 고려했습니다.
+
+## 모델별 평균 성능
+
+| Model | Accuracy | Macro F1 | Inference ms/sample | Fit seconds |
+| --- | --- | --- | --- | --- |
+| Naive Bayes | 0.8862 ± 0.0162 | 0.8826 ± 0.0176 | 0.0286 ± 0.0038 | 0.0772 ± 0.0037 |
+| Logistic Regression | 0.9141 ± 0.0115 | 0.9128 ± 0.0124 | 0.0909 ± 0.0474 | 1.5870 ± 0.4902 |
+| Linear SVM | 0.9282 ± 0.0213 | 0.9281 ± 0.0213 | 0.0249 ± 0.0034 | 0.0956 ± 0.0115 |
+
+### 평균 성능 해석
+
+- Linear SVM은 Macro F1 평균에서 1위이며, 2위인 Logistic Regression보다 0.0152 높았습니다.
+- 안정성만 보면 Logistic Regression의 Macro F1 표준편차가 0.0124로 가장 낮습니다.
+- Linear SVM의 Macro F1 표준편차는 0.0213으로 Logistic Regression보다 크지만, 평균 Macro F1과 Accuracy가 모두 가장 높고 추론 비용도 낮아 최종 모델로 더 적합합니다.
+
+## 시각화
+
+![모델별 Accuracy/Macro F1 mean ± std](cv_metric_summary.png)
+
+![Fold별 Accuracy/Macro F1 안정성](cv_fold_scores.png)
+
+![모델별 평균 추론 시간](cv_inference_speed.png)
+
+![Linear SVM out-of-fold confusion matrix](linear_svm_oof_confusion_matrix.png)
+
+## Fold별 성능
+
+| Model | Fold | Accuracy | Macro F1 | Inference ms/sample |
+| --- | --- | --- | --- | --- |
+| Naive Bayes | 1 | 0.8863 | 0.8801 | 0.0291 |
+| Naive Bayes | 2 | 0.8706 | 0.8648 | 0.0294 |
+| Naive Bayes | 3 | 0.8961 | 0.8921 | 0.0289 |
+| Naive Bayes | 4 | 0.8706 | 0.8684 | 0.0331 |
+| Naive Bayes | 5 | 0.9077 | 0.9075 | 0.0226 |
+| Logistic Regression | 1 | 0.9059 | 0.9007 | 0.0397 |
+| Logistic Regression | 2 | 0.9078 | 0.9066 | 0.0804 |
+| Logistic Regression | 3 | 0.9294 | 0.9268 | 0.1029 |
+| Logistic Regression | 4 | 0.9039 | 0.9044 | 0.0662 |
+| Logistic Regression | 5 | 0.9234 | 0.9257 | 0.1650 |
+| Linear SVM | 1 | 0.9294 | 0.9278 | 0.0227 |
+| Linear SVM | 2 | 0.9176 | 0.9153 | 0.0285 |
+| Linear SVM | 3 | 0.9490 | 0.9476 | 0.0288 |
+| Linear SVM | 4 | 0.8980 | 0.8998 | 0.0224 |
+| Linear SVM | 5 | 0.9470 | 0.9498 | 0.0220 |
+
+## Confusion Matrix 기반 카테고리별 성능
+
+- 기준: Linear SVM out-of-fold 예측 전체
+- OOF Accuracy: 0.9282
+- OOF Macro F1: 0.9280
+
+| Label | Precision | Recall | F1 | Support |
+| --- | --- | --- | --- | --- |
+| 공원 | 0.9252 | 0.9543 | 0.9395 | 350 |
+| 문화 | 0.9002 | 0.8842 | 0.8921 | 449 |
+| 쇼핑 | 0.9672 | 0.9440 | 0.9555 | 250 |
+| 술집 | 0.8736 | 0.9120 | 0.8924 | 250 |
+| 식당 | 0.9302 | 0.9333 | 0.9318 | 300 |
+| 운동 | 0.9456 | 0.9380 | 0.9418 | 500 |
+| 카페 | 0.9483 | 0.9378 | 0.9430 | 450 |
+
+## 산출물
+
+- `cv_results.json`: 전체 교차 검증 결과 원본
+- `cv_summary.csv`: 모델별 평균/표준편차 요약
+- `cv_fold_results.csv`: fold별 성능 결과
+- `cv_metric_summary.png`: 모델별 Accuracy/Macro F1 mean ± std
+- `cv_fold_scores.png`: fold별 Accuracy/Macro F1 안정성
+- `cv_inference_speed.png`: 모델별 평균 추론 시간
+- `linear_svm_oof_confusion_matrix.png`: 선정 모델 out-of-fold confusion matrix
+
+## 선정 근거
+
+Linear SVM은 핵심 지표인 Macro F1 평균이 가장 높고 (0.9281), Accuracy 평균도 0.9282로 가장 우수했습니다. Macro F1 표준편차는 Logistic Regression보다 크지만 모든 fold에서 0.8998 이상의 Macro F1을 유지했고, 평균 성능 우위와 낮은 추론 비용이 운영 적용에 더 적합합니다. 또한 TF-IDF + LinearSVC 구조라 학습과 추론 비용이 낮고 운영 artifact도 기존 pipeline 방식으로 단순하게 유지됩니다.
