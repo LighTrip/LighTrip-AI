@@ -54,6 +54,8 @@ model_settings.*
 
 # 프롬프트 파일
 prompts/
+!app/prompts/
+!app/prompts/*.py
 configs/*prompt*
 *.prompt
 *.prompt.*
