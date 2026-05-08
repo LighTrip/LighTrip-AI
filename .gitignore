@@ -1,5 +1,6 @@
 # 모델 파일
 *.gguf
+*.joblib
 models/
 
 # 실험용 이미지
@@ -8,9 +9,9 @@ experiments/**/images/
 # 로그 / 결과 파일
 *.log
 *.txt
-!configs/draft_prompt.txt
 !requirements-dataset.txt
 !requirements-classifier.txt
+!requirements-api.txt
 !experiments/category_classifier/stopwords_ko.txt
 outputs/
 experiments/category_classifier/artifacts/
@@ -21,10 +22,23 @@ data/raw/
 data/images/
 data/interim/
 data/processed/
+data/**/*.jpg
+data/**/*.jpeg
+data/**/*.png
+data/**/*.webp
+data/**/*.csv
+data/**/*.jsonl
+data_places365/*/
 data_places365/images/
 data_places365/interim/
 data_places365/processed/
 data_places365/reports/
+data_places365/**/*.jpg
+data_places365/**/*.jpeg
+data_places365/**/*.png
+data_places365/**/*.webp
+data_places365/**/*.csv
+data_places365/**/*.jsonl
 
 # Python
 __pycache__/
@@ -32,3 +46,25 @@ __pycache__/
 
 # 환경파일
 .env
+.env.*
+*.env
+*.local
+*.local.*
+model_settings.*
+
+# 프롬프트 파일
+prompts/
+!app/prompts/
+!app/prompts/*.py
+configs/*prompt*
+!configs/draft_prompt.txt
+*.prompt
+*.prompt.*
+
+# 로컬/임시 파일
+.codex
+argparse
+json
+os
+sys
+time
