@@ -15,6 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "configs" / "dataset_categories.json"
 DEFAULT_PLACES365_DIR = PROJECT_ROOT / "data_places365"
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+TRUE_VALUES = {"1", "true", "yes", "on"}
 
 
 @dataclass(frozen=True)
@@ -153,6 +154,13 @@ def configure_gemma_environment(
         os.environ.setdefault("GEMMA_N_GPU_LAYERS", str(gpu_layers))
 
 
+def env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in TRUE_VALUES
+
+
 def load_generation_runtime() -> tuple[set[str], Any, Any]:
     from app.services.gemma_service import (
         ALLOWED_IMAGE_TYPES,
@@ -161,7 +169,7 @@ def load_generation_runtime() -> tuple[set[str], Any, Any]:
         load_model,
     )
 
-    load_model(verbose=True)
+    load_model(verbose=env_bool("GEMMA_VERBOSE", True))
     llm = get_llm()
 
     if llm is None:
@@ -177,13 +185,16 @@ def generate_text_for_image(
     image_path: Path,
     dataset_prompt: str,
 ) -> tuple[str, float]:
+    from llama_cpp.llama_chat_format import suppress_stdout_stderr
+
     started_at = time.perf_counter()
-    generated_text = generate_blog_draft_from_bytes(
-        llm=llm,
-        image_bytes=image_path.read_bytes(),
-        filename=image_path.name,
-        user_prompt=dataset_prompt,
-    )
+    with suppress_stdout_stderr(disable=env_bool("GEMMA_VERBOSE", True)):
+        generated_text = generate_blog_draft_from_bytes(
+            llm=llm,
+            image_bytes=image_path.read_bytes(),
+            filename=image_path.name,
+            user_prompt=dataset_prompt,
+        )
     elapsed = round(time.perf_counter() - started_at, 2)
     return generated_text, elapsed
 
