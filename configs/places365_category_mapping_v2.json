@@ -1,0 +1,798 @@
+{
+  "schema_version": 1,
+  "review_date": "2026-05-10",
+  "source_dataset": "Andron00e/Places365-custom",
+  "source_split": "train",
+  "reviewed_dataset_dir": "data_places365_2",
+  "source_config": "configs/places365_categories_v2.json",
+  "mapping_policy": "service_aligned_direct_only_v2",
+  "decision_values": [
+    "keep",
+    "keep_sample_review",
+    "exclude",
+    "zero_sample"
+  ],
+  "usage": {
+    "train_with": [
+      "keep",
+      "keep_sample_review"
+    ],
+    "filter_before_training": [
+      "keep_sample_review"
+    ],
+    "do_not_train_with": [
+      "exclude"
+    ],
+    "no_current_training_effect": [
+      "zero_sample"
+    ]
+  },
+  "categories": [
+    {
+      "label": "카페",
+      "slug": "cafe",
+      "places365": [
+        {
+          "id": 99,
+          "label": "coffee shop",
+          "slug": "coffee_shop",
+          "samples": 1000,
+          "decision": "keep",
+          "rationale": "카페 서비스 카테고리와 직접 대응된다."
+        }
+      ]
+    },
+    {
+      "label": "식당",
+      "slug": "restaurant",
+      "places365": [
+        {
+          "id": 119,
+          "label": "diner outdoor",
+          "slug": "diner_outdoor",
+          "samples": 0,
+          "decision": "zero_sample",
+          "rationale": "식당으로 매핑 가능하지만 현재 수집 샘플이 없다."
+        },
+        {
+          "id": 139,
+          "label": "fastfood restaurant",
+          "slug": "fastfood_restaurant",
+          "samples": 200,
+          "decision": "keep",
+          "rationale": "식당 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 148,
+          "label": "food court",
+          "slug": "food_court",
+          "samples": 200,
+          "decision": "keep_sample_review",
+          "rationale": "식당에 적합하지만 쇼핑몰, 행사장, 공용 좌석 샘플이 섞일 수 있다."
+        },
+        {
+          "id": 267,
+          "label": "pizzeria",
+          "slug": "pizzeria",
+          "samples": 200,
+          "decision": "keep",
+          "rationale": "식당 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 284,
+          "label": "restaurant",
+          "slug": "restaurant",
+          "samples": 200,
+          "decision": "keep",
+          "rationale": "식당 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 286,
+          "label": "restaurant patio",
+          "slug": "restaurant_patio",
+          "samples": 200,
+          "decision": "keep_sample_review",
+          "rationale": "식당 테라스는 적합하지만 빈 테라스, 풍경, 리조트형 샘플이 섞일 수 있다."
+        }
+      ]
+    },
+    {
+      "label": "술집",
+      "slug": "bar",
+      "places365": [
+        {
+          "id": 39,
+          "label": "bar",
+          "slug": "bar",
+          "samples": 334,
+          "decision": "keep",
+          "rationale": "술집 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 53,
+          "label": "beer garden",
+          "slug": "beer_garden",
+          "samples": 334,
+          "decision": "keep_sample_review",
+          "rationale": "술집에 적합하지만 야외 행사, 잔디, 공원형 샘플이 섞일 수 있다."
+        },
+        {
+          "id": 54,
+          "label": "beer hall",
+          "slug": "beer_hall",
+          "samples": 332,
+          "decision": "keep",
+          "rationale": "술집 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 274,
+          "label": "pub indoor",
+          "slug": "pub_indoor",
+          "samples": 0,
+          "decision": "zero_sample",
+          "rationale": "술집으로 매핑 가능하지만 현재 수집 샘플이 없다."
+        }
+      ]
+    },
+    {
+      "label": "문화",
+      "slug": "culture",
+      "places365": [
+        {
+          "id": 5,
+          "label": "amphitheater",
+          "slug": "amphitheater",
+          "samples": 250,
+          "decision": "keep_sample_review",
+          "rationale": "문화 시설로 볼 수 있지만 야외 계단, 공원 시설, 관광지 건축물 샘플이 섞일 수 있다."
+        },
+        {
+          "id": 19,
+          "label": "art gallery",
+          "slug": "art_gallery",
+          "samples": 250,
+          "decision": "keep",
+          "rationale": "문화 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 212,
+          "label": "library indoor",
+          "slug": "library_indoor",
+          "samples": 0,
+          "decision": "zero_sample",
+          "rationale": "문화로 매핑 가능하지만 현재 수집 샘플이 없다."
+        },
+        {
+          "id": 235,
+          "label": "movie theater indoor",
+          "slug": "movie_theater_indoor",
+          "samples": 0,
+          "decision": "zero_sample",
+          "rationale": "문화로 매핑 가능하지만 현재 수집 샘플이 없다."
+        },
+        {
+          "id": 236,
+          "label": "museum indoor",
+          "slug": "museum_indoor",
+          "samples": 0,
+          "decision": "zero_sample",
+          "rationale": "문화로 매핑 가능하지만 현재 수집 샘플이 없다."
+        },
+        {
+          "id": 239,
+          "label": "natural history museum",
+          "slug": "natural_history_museum",
+          "samples": 250,
+          "decision": "keep",
+          "rationale": "문화 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 297,
+          "label": "science museum",
+          "slug": "science_museum",
+          "samples": 250,
+          "decision": "keep",
+          "rationale": "문화 서비스 카테고리와 직접 대응된다."
+        }
+      ]
+    },
+    {
+      "label": "쇼핑",
+      "slug": "shopping",
+      "places365": [
+        {
+          "id": 46,
+          "label": "bazaar indoor",
+          "slug": "bazaar_indoor",
+          "samples": 0,
+          "decision": "zero_sample",
+          "rationale": "쇼핑으로 매핑 가능하지만 현재 수집 샘플이 없다."
+        },
+        {
+          "id": 47,
+          "label": "bazaar outdoor",
+          "slug": "bazaar_outdoor",
+          "samples": 0,
+          "decision": "zero_sample",
+          "rationale": "쇼핑으로 매핑 가능하지만 현재 수집 샘플이 없고, 재수집 시 거리/관광지 경계 검토가 필요하다."
+        },
+        {
+          "id": 96,
+          "label": "clothing store",
+          "slug": "clothing_store",
+          "samples": 143,
+          "decision": "keep",
+          "rationale": "쇼핑 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 115,
+          "label": "department store",
+          "slug": "department_store",
+          "samples": 143,
+          "decision": "keep",
+          "rationale": "쇼핑 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 146,
+          "label": "flea market indoor",
+          "slug": "flea_market_indoor",
+          "samples": 0,
+          "decision": "zero_sample",
+          "rationale": "쇼핑으로 매핑 가능하지만 현재 수집 샘플이 없다."
+        },
+        {
+          "id": 160,
+          "label": "general store indoor",
+          "slug": "general_store_indoor",
+          "samples": 0,
+          "decision": "zero_sample",
+          "rationale": "쇼핑으로 매핑 가능하지만 현재 수집 샘플이 없다."
+        },
+        {
+          "id": 162,
+          "label": "gift shop",
+          "slug": "gift_shop",
+          "samples": 143,
+          "decision": "keep",
+          "rationale": "쇼핑 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 198,
+          "label": "jewelry shop",
+          "slug": "jewelry_shop",
+          "samples": 142,
+          "decision": "keep",
+          "rationale": "쇼핑 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 222,
+          "label": "market indoor",
+          "slug": "market_indoor",
+          "samples": 0,
+          "decision": "zero_sample",
+          "rationale": "쇼핑으로 매핑 가능하지만 현재 수집 샘플이 없다."
+        },
+        {
+          "id": 223,
+          "label": "market outdoor",
+          "slug": "market_outdoor",
+          "samples": 0,
+          "decision": "zero_sample",
+          "rationale": "쇼핑으로 매핑 가능하지만 현재 수집 샘플이 없고, 재수집 시 거리/관광지 경계 검토가 필요하다."
+        },
+        {
+          "id": 300,
+          "label": "shoe shop",
+          "slug": "shoe_shop",
+          "samples": 143,
+          "decision": "keep",
+          "rationale": "쇼핑 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 302,
+          "label": "shopping mall indoor",
+          "slug": "shopping_mall_indoor",
+          "samples": 0,
+          "decision": "zero_sample",
+          "rationale": "쇼핑으로 매핑 가능하지만 현재 수집 샘플이 없다."
+        },
+        {
+          "id": 321,
+          "label": "supermarket",
+          "slug": "supermarket",
+          "samples": 143,
+          "decision": "keep",
+          "rationale": "쇼핑 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 335,
+          "label": "toyshop",
+          "slug": "toyshop",
+          "samples": 143,
+          "decision": "keep",
+          "rationale": "쇼핑 서비스 카테고리와 직접 대응된다."
+        }
+      ]
+    },
+    {
+      "label": "운동",
+      "slug": "exercise",
+      "places365": [
+        {
+          "id": 24,
+          "label": "athletic field outdoor",
+          "slug": "athletic_field_outdoor",
+          "samples": 0,
+          "decision": "zero_sample",
+          "rationale": "운동으로 매핑 가능하지만 현재 수집 샘플이 없고, 재수집 시 공원/학교 운동장 경계 검토가 필요하다."
+        },
+        {
+          "id": 42,
+          "label": "baseball field",
+          "slug": "baseball_field",
+          "samples": 125,
+          "decision": "keep",
+          "rationale": "운동 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 44,
+          "label": "basketball court indoor",
+          "slug": "basketball_court_indoor",
+          "samples": 0,
+          "decision": "zero_sample",
+          "rationale": "운동으로 매핑 가능하지만 현재 수집 샘플이 없다."
+        },
+        {
+          "id": 64,
+          "label": "bowling alley",
+          "slug": "bowling_alley",
+          "samples": 125,
+          "decision": "keep",
+          "rationale": "운동 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 65,
+          "label": "boxing ring",
+          "slug": "boxing_ring",
+          "samples": 125,
+          "decision": "keep",
+          "rationale": "운동 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 149,
+          "label": "football field",
+          "slug": "football_field",
+          "samples": 125,
+          "decision": "keep",
+          "rationale": "운동 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 164,
+          "label": "golf course",
+          "slug": "golf_course",
+          "samples": 125,
+          "decision": "keep_sample_review",
+          "rationale": "운동에 적합하지만 잔디/풍경 중심 샘플은 공원처럼 보일 수 있다."
+        },
+        {
+          "id": 168,
+          "label": "gymnasium indoor",
+          "slug": "gymnasium_indoor",
+          "samples": 0,
+          "decision": "zero_sample",
+          "rationale": "운동으로 매핑 가능하지만 현재 수집 샘플이 없다."
+        },
+        {
+          "id": 188,
+          "label": "ice skating rink indoor",
+          "slug": "ice_skating_rink_indoor",
+          "samples": 0,
+          "decision": "zero_sample",
+          "rationale": "운동으로 매핑 가능하지만 현재 수집 샘플이 없다."
+        },
+        {
+          "id": 189,
+          "label": "ice skating rink outdoor",
+          "slug": "ice_skating_rink_outdoor",
+          "samples": 0,
+          "decision": "zero_sample",
+          "rationale": "운동으로 매핑 가능하지만 현재 수집 샘플이 없고, 재수집 시 관광/공원 경계 검토가 필요하다."
+        },
+        {
+          "id": 225,
+          "label": "martial arts gym",
+          "slug": "martial_arts_gym",
+          "samples": 125,
+          "decision": "keep",
+          "rationale": "운동 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 305,
+          "label": "ski slope",
+          "slug": "ski_slope",
+          "samples": 125,
+          "decision": "keep_sample_review",
+          "rationale": "운동에 적합하지만 자연/여행 풍경 샘플과 혼동될 수 있다."
+        },
+        {
+          "id": 310,
+          "label": "soccer field",
+          "slug": "soccer_field",
+          "samples": 125,
+          "decision": "keep",
+          "rationale": "운동 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 325,
+          "label": "swimming pool indoor",
+          "slug": "swimming_pool_indoor",
+          "samples": 0,
+          "decision": "zero_sample",
+          "rationale": "운동으로 매핑 가능하지만 현재 수집 샘플이 없다."
+        },
+        {
+          "id": 326,
+          "label": "swimming pool outdoor",
+          "slug": "swimming_pool_outdoor",
+          "samples": 0,
+          "decision": "zero_sample",
+          "rationale": "운동으로 매핑 가능하지만 현재 수집 샘플이 없고, 재수집 시 리조트/여행 경계 검토가 필요하다."
+        },
+        {
+          "id": 351,
+          "label": "volleyball court outdoor",
+          "slug": "volleyball_court_outdoor",
+          "samples": 0,
+          "decision": "zero_sample",
+          "rationale": "운동으로 매핑 가능하지만 현재 수집 샘플이 없고, 재수집 시 해변/공원 경계 검토가 필요하다."
+        }
+      ]
+    },
+    {
+      "label": "공원",
+      "slug": "park",
+      "places365": [
+        {
+          "id": 62,
+          "label": "botanical garden",
+          "slug": "botanical_garden",
+          "samples": 125,
+          "decision": "keep",
+          "rationale": "식물원/정원 장면은 서비스 기준에서 공원 카테고리로 사용한다."
+        },
+        {
+          "id": 153,
+          "label": "formal garden",
+          "slug": "formal_garden",
+          "samples": 125,
+          "decision": "keep",
+          "rationale": "공원 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 197,
+          "label": "japanese garden",
+          "slug": "japanese_garden",
+          "samples": 125,
+          "decision": "keep",
+          "rationale": "공원 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 254,
+          "label": "park",
+          "slug": "park",
+          "samples": 125,
+          "decision": "keep",
+          "rationale": "공원 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 265,
+          "label": "picnic area",
+          "slug": "picnic_area",
+          "samples": 125,
+          "decision": "keep",
+          "rationale": "피크닉 장소는 서비스 기준에서 공원 카테고리로 사용한다."
+        },
+        {
+          "id": 268,
+          "label": "playground",
+          "slug": "playground",
+          "samples": 125,
+          "decision": "keep",
+          "rationale": "운동보다는 공원 내 놀이 시설로 해석하는 것이 서비스 기준에 맞다."
+        },
+        {
+          "id": 333,
+          "label": "topiary garden",
+          "slug": "topiary_garden",
+          "samples": 125,
+          "decision": "keep",
+          "rationale": "공원 서비스 카테고리와 직접 대응된다."
+        },
+        {
+          "id": 364,
+          "label": "zen garden",
+          "slug": "zen_garden",
+          "samples": 125,
+          "decision": "keep",
+          "rationale": "공원 서비스 카테고리와 직접 대응된다."
+        }
+      ]
+    }
+  ],
+  "excluded_labels": [
+    {
+      "id": 31,
+      "label": "bakery shop",
+      "slug": "bakery_shop",
+      "candidate_categories": [
+        "카페",
+        "쇼핑"
+      ],
+      "decision": "exclude",
+      "rationale": "제과 판매점과 카페 경계가 크고, 상품 진열 중심 샘플이 섞일 수 있다."
+    },
+    {
+      "id": 75,
+      "label": "cafeteria",
+      "slug": "cafeteria",
+      "candidate_categories": [
+        "카페",
+        "식당"
+      ],
+      "decision": "exclude",
+      "rationale": "구내식당, 행사 식사 공간, 일반 식당 단서가 섞여 카페/식당 모두에 noise가 크다."
+    },
+    {
+      "id": null,
+      "label": "bookstore",
+      "slug": "bookstore",
+      "candidate_categories": [
+        "문화",
+        "쇼핑"
+      ],
+      "decision": "exclude",
+      "rationale": "책 판매 공간과 도서관/열람/전시 느낌이 섞여 서비스 기준이 흔들린다."
+    },
+    {
+      "id": 114,
+      "label": "delicatessen",
+      "slug": "delicatessen",
+      "candidate_categories": [
+        "식당",
+        "쇼핑"
+      ],
+      "decision": "exclude",
+      "rationale": "음식점과 식료품 판매점 경계가 크다."
+    },
+    {
+      "id": 120,
+      "label": "dining hall",
+      "slug": "dining_hall",
+      "candidate_categories": [
+        "식당"
+      ],
+      "decision": "exclude",
+      "rationale": "단체 급식, 학교, 행사 식사 공간으로 확산될 수 있다."
+    },
+    {
+      "id": 121,
+      "label": "dining room",
+      "slug": "dining_room",
+      "candidate_categories": [
+        "식당"
+      ],
+      "decision": "exclude",
+      "rationale": "가정집 식사 공간과 혼동 가능성이 높다."
+    },
+    {
+      "id": 122,
+      "label": "discotheque",
+      "slug": "discotheque",
+      "candidate_categories": [
+        "술집",
+        "문화"
+      ],
+      "decision": "exclude",
+      "rationale": "클럽, 공연, 조명, 무대 단서가 섞여 술집 대표성이 약하다."
+    },
+    {
+      "id": 185,
+      "label": "ice cream parlor",
+      "slug": "ice_cream_parlor",
+      "candidate_categories": [
+        "카페",
+        "쇼핑"
+      ],
+      "decision": "exclude",
+      "rationale": "디저트 매장, 상품 close-up, 판매점 이미지가 섞인다."
+    },
+    {
+      "id": 27,
+      "label": "auditorium",
+      "slug": "auditorium",
+      "candidate_categories": [
+        "문화"
+      ],
+      "decision": "exclude",
+      "rationale": "공연장보다 강당, 컨퍼런스, 행사장 단서가 넓게 섞인다."
+    },
+    {
+      "id": 161,
+      "label": "general store outdoor",
+      "slug": "general_store_outdoor",
+      "candidate_categories": [
+        "쇼핑"
+      ],
+      "decision": "exclude",
+      "rationale": "쇼핑 경험보다 건물 외관 또는 거리 장면으로 보일 수 있다."
+    },
+    {
+      "id": 213,
+      "label": "library outdoor",
+      "slug": "library_outdoor",
+      "candidate_categories": [
+        "문화"
+      ],
+      "decision": "exclude",
+      "rationale": "문화 활동 공간보다 건물 외관 단서가 강할 수 있다."
+    },
+    {
+      "id": 237,
+      "label": "museum outdoor",
+      "slug": "museum_outdoor",
+      "candidate_categories": [
+        "문화"
+      ],
+      "decision": "exclude",
+      "rationale": "박물관 내부 경험보다 외관/관광지 단서가 강할 수 있다."
+    },
+    {
+      "id": 238,
+      "label": "music studio",
+      "slug": "music_studio",
+      "candidate_categories": [
+        "문화"
+      ],
+      "decision": "exclude",
+      "rationale": "문화 향유 장소보다 녹음실/작업공간에 가깝다."
+    },
+    {
+      "id": 209,
+      "label": "lawn",
+      "slug": "lawn",
+      "candidate_categories": [
+        "공원"
+      ],
+      "decision": "exclude",
+      "rationale": "공원보다 일반 녹지, 주택 마당, 조경, 골프장 단서로 확산된다."
+    },
+    {
+      "id": 290,
+      "label": "roof garden",
+      "slug": "roof_garden",
+      "candidate_categories": [
+        "공원"
+      ],
+      "decision": "exclude",
+      "rationale": "공원보다 건물 부속 공간으로 보일 가능성이 크다."
+    },
+    {
+      "id": 301,
+      "label": "shopfront",
+      "slug": "shopfront",
+      "candidate_categories": [
+        "쇼핑"
+      ],
+      "decision": "exclude",
+      "rationale": "상점 내부 쇼핑 경험보다 거리/건물 외관 단서가 강하다."
+    },
+    {
+      "id": 304,
+      "label": "ski resort",
+      "slug": "ski_resort",
+      "candidate_categories": [
+        "운동"
+      ],
+      "decision": "exclude",
+      "rationale": "운동보다 숙박, 여행, 리조트 단서가 섞인다."
+    },
+    {
+      "id": 312,
+      "label": "stadium baseball",
+      "slug": "stadium_baseball",
+      "candidate_categories": [
+        "운동"
+      ],
+      "decision": "exclude",
+      "rationale": "직접 운동 장소보다 관람장/대형 경기장 단서가 강하다."
+    },
+    {
+      "id": 313,
+      "label": "stadium football",
+      "slug": "stadium_football",
+      "candidate_categories": [
+        "운동"
+      ],
+      "decision": "exclude",
+      "rationale": "직접 운동 장소보다 관람장/대형 경기장 단서가 강하다."
+    },
+    {
+      "id": 314,
+      "label": "stadium soccer",
+      "slug": "stadium_soccer",
+      "candidate_categories": [
+        "운동"
+      ],
+      "decision": "exclude",
+      "rationale": "직접 운동 장소보다 관람장/대형 경기장 단서가 강하다."
+    },
+    {
+      "id": 315,
+      "label": "stage indoor",
+      "slug": "stage_indoor",
+      "candidate_categories": [
+        "문화"
+      ],
+      "decision": "exclude",
+      "rationale": "공연장 전체보다 무대 일부 장면에 치우친다."
+    },
+    {
+      "id": 316,
+      "label": "stage outdoor",
+      "slug": "stage_outdoor",
+      "candidate_categories": [
+        "문화"
+      ],
+      "decision": "exclude",
+      "rationale": "야외 행사, 축제, 무대 세부 장면으로 확산된다."
+    },
+    {
+      "id": 322,
+      "label": "sushi bar",
+      "slug": "sushi_bar",
+      "candidate_categories": [
+        "식당",
+        "술집"
+      ],
+      "decision": "exclude",
+      "rationale": "식당 샘플도 있으나 바 좌석/음주 단서와 섞인다."
+    },
+    {
+      "id": 324,
+      "label": "swimming hole",
+      "slug": "swimming_hole",
+      "candidate_categories": [
+        "운동",
+        "공원"
+      ],
+      "decision": "exclude",
+      "rationale": "수영 시설보다 자연 물놀이 장소로 보일 가능성이 높다."
+    },
+    {
+      "id": 353,
+      "label": "water park",
+      "slug": "water_park",
+      "candidate_categories": [
+        "운동",
+        "공원"
+      ],
+      "decision": "exclude",
+      "rationale": "운동보다 레저/테마파크/여행 단서가 강하다."
+    },
+    {
+      "id": 358,
+      "label": "wet bar",
+      "slug": "wet_bar",
+      "candidate_categories": [
+        "술집"
+      ],
+      "decision": "exclude",
+      "rationale": "실제 서비스 술집보다 주거/호텔/욕실/주방 설비 샘플이 많다."
+    }
+  ],
+  "notes": [
+    "카테고리별 수량은 균형적이지만 label-level imbalance가 존재한다.",
+    "기타 카테고리는 data_places365_2에 포함되어 있지 않으므로 별도 unknown/negative 데이터가 필요하다.",
+    "bookstore는 v2 원본 제외 목록에 없었으나 샘플 검토 결과 exclude로 명시했다."
+  ]
+}

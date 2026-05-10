@@ -1,0 +1,168 @@
+{
+  "total_images": 7000,
+  "status_counts": {
+    "accepted": 5763,
+    "rejected": 4,
+    "review_required": 1233
+  },
+  "category_status_counts": {
+    "공원": {
+      "accepted": 1000
+    },
+    "문화": {
+      "accepted": 750,
+      "rejected": 1,
+      "review_required": 249
+    },
+    "쇼핑": {
+      "accepted": 1000
+    },
+    "술집": {
+      "accepted": 666,
+      "review_required": 334
+    },
+    "식당": {
+      "accepted": 598,
+      "rejected": 2,
+      "review_required": 400
+    },
+    "운동": {
+      "accepted": 749,
+      "rejected": 1,
+      "review_required": 250
+    },
+    "카페": {
+      "accepted": 1000
+    }
+  },
+  "places365_status_counts": {
+    "amphitheater": {
+      "rejected": 1,
+      "review_required": 249
+    },
+    "art_gallery": {
+      "accepted": 250
+    },
+    "bar": {
+      "accepted": 334
+    },
+    "baseball_field": {
+      "accepted": 125
+    },
+    "beer_garden": {
+      "review_required": 334
+    },
+    "beer_hall": {
+      "accepted": 332
+    },
+    "botanical_garden": {
+      "accepted": 125
+    },
+    "bowling_alley": {
+      "accepted": 125
+    },
+    "boxing_ring": {
+      "accepted": 125
+    },
+    "clothing_store": {
+      "accepted": 143
+    },
+    "coffee_shop": {
+      "accepted": 1000
+    },
+    "department_store": {
+      "accepted": 143
+    },
+    "fastfood_restaurant": {
+      "accepted": 198,
+      "rejected": 2
+    },
+    "food_court": {
+      "review_required": 200
+    },
+    "football_field": {
+      "accepted": 125
+    },
+    "formal_garden": {
+      "accepted": 125
+    },
+    "gift_shop": {
+      "accepted": 143
+    },
+    "golf_course": {
+      "review_required": 125
+    },
+    "japanese_garden": {
+      "accepted": 125
+    },
+    "jewelry_shop": {
+      "accepted": 142
+    },
+    "martial_arts_gym": {
+      "accepted": 125
+    },
+    "natural_history_museum": {
+      "accepted": 250
+    },
+    "park": {
+      "accepted": 125
+    },
+    "picnic_area": {
+      "accepted": 125
+    },
+    "pizzeria": {
+      "accepted": 200
+    },
+    "playground": {
+      "accepted": 125
+    },
+    "restaurant": {
+      "accepted": 200
+    },
+    "restaurant_patio": {
+      "review_required": 200
+    },
+    "science_museum": {
+      "accepted": 250
+    },
+    "shoe_shop": {
+      "accepted": 143
+    },
+    "ski_slope": {
+      "review_required": 125
+    },
+    "soccer_field": {
+      "accepted": 124,
+      "rejected": 1
+    },
+    "supermarket": {
+      "accepted": 143
+    },
+    "topiary_garden": {
+      "accepted": 125
+    },
+    "toyshop": {
+      "accepted": 143
+    },
+    "zen_garden": {
+      "accepted": 125
+    }
+  },
+  "rejection_reason_counts": {
+    "extreme_aspect_ratio": 4
+  },
+  "review_flag_counts": {
+    "ambiguous_label": 1234
+  },
+  "metadata": "data_places365_2/metadata.csv",
+  "mapping": "configs/places365_category_mapping_v2.json",
+  "output_dir": "data_places365_2/quality",
+  "thresholds": {
+    "min_dimension": 128,
+    "min_aspect_ratio": 0.33,
+    "max_aspect_ratio": 3.0,
+    "dark_threshold": 10.0,
+    "bright_threshold": 245.0,
+    "low_contrast_threshold": 5.0
+  }
+}
