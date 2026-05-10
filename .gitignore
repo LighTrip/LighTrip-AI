@@ -39,6 +39,7 @@ data_places365/**/*.png
 data_places365/**/*.webp
 data_places365/**/*.csv
 data_places365/**/*.jsonl
+data_places365_2/
 
 # Python
 __pycache__/
