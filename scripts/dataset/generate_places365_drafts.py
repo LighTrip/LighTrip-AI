@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,7 @@ bootstrap_project_root()
 
 from scripts.dataset.common import (
     DEFAULT_PLACES365_DIR,
+    PROJECT_ROOT,
     DraftImage,
     add_generation_arguments,
     append_jsonl,
@@ -23,6 +25,7 @@ from scripts.dataset.common import (
     load_generation_categories,
     load_generation_rows,
     load_generation_runtime,
+    read_jsonl,
     record_generated_draft,
     should_skip_draft_image,
 )
@@ -36,6 +39,16 @@ CATEGORY_HINTS = {
     "쇼핑": "매장이나 쇼핑 공간에서 물건을 구경하고 고르는 상황을 떠올려라.",
     "공원": "공원이나 자연 속에서 산책하거나 쉬어가는 상황을 떠올려라.",
 }
+
+
+@dataclass(frozen=True)
+class ManifestDraftImage:
+    path: Path
+    slug: str
+    label: str
+    source_label: str = ""
+    row_id: str = ""
+    split: str = ""
 
 
 def remove_etc_category(slug_to_label: dict[str, str]) -> dict[str, str]:
@@ -77,8 +90,69 @@ def iter_places365_images(
     return images
 
 
+def project_path(path_value: str) -> Path:
+    path = Path(path_value)
+    if path.is_absolute():
+        return path
+    return PROJECT_ROOT / path
+
+
+def iter_manifest_images(
+    manifest_path: Path,
+    slug_to_label: dict[str, str],
+) -> list[ManifestDraftImage]:
+    rows = read_jsonl(manifest_path)
+    allowed_labels = set(slug_to_label.values())
+    slug_by_label = {label: slug for slug, label in slug_to_label.items()}
+    images: list[ManifestDraftImage] = []
+
+    for index, row in enumerate(rows, start=1):
+        label = str(row.get("label", ""))
+        if label not in allowed_labels:
+            continue
+
+        image_path = str(row.get("image_path") or row.get("image") or "")
+        if not image_path:
+            print(f"[WARN] manifest row {index} image_path 없음")
+            continue
+
+        path = project_path(image_path)
+        if not path.exists():
+            print(f"[WARN] manifest 이미지 없음: {path}")
+            continue
+
+        slug = str(row.get("category_slug") or slug_by_label[label])
+        source_label = str(
+            row.get("places365_slug")
+            or row.get("source_label")
+            or path.parent.name
+        )
+        row_id = str(row.get("id") or build_row_id(slug, source_label, path))
+        split = str(row.get("split") or "")
+
+        images.append(
+            ManifestDraftImage(
+                path=path,
+                slug=slug,
+                label=label,
+                source_label=source_label,
+                row_id=row_id,
+                split=split,
+            )
+        )
+
+    return images
+
+
 def build_row_id(slug: str, source_label: str, image_path: Path) -> str:
     return f"{slug}_{source_label}_{image_path.stem}"
+
+
+def row_id_for_image(image: DraftImage | ManifestDraftImage) -> str:
+    manifest_row_id = getattr(image, "row_id", "")
+    if manifest_row_id:
+        return manifest_row_id
+    return build_row_id(image.slug, image.source_label, image.path)
 
 
 def build_dataset_user_prompt(
@@ -110,6 +184,12 @@ def parse_args() -> argparse.Namespace:
         default_input_dir=DEFAULT_PLACES365_DIR,
         default_output=Path("data_places365/interim/places365_generated_drafts.jsonl"),
         default_gpu_layers=20,
+    )
+    parser.add_argument(
+        "--manifest",
+        type=Path,
+        default=None,
+        help="생성 대상 이미지 manifest JSONL입니다. 지정하면 input-dir 전체 순회 대신 manifest의 image_path만 사용합니다.",
     )
     return parser.parse_args()
 
@@ -159,9 +239,12 @@ def print_dry_run_sample(
     dataset_prompt = build_prompt_from_args(args, image.label)
 
     print(f"sample_image: {image.path}")
+    print(f"id: {row_id_for_image(image)}")
     print(f"slug: {image.slug}")
     print(f"label: {image.label}")
     print(f"source_label: {image.source_label}")
+    if getattr(image, "split", ""):
+        print(f"split: {getattr(image, 'split')}")
     print("\nuser_prompt:")
     print(dataset_prompt or "(empty)")
 
@@ -188,7 +271,7 @@ def try_generate_text_for_image(
 def generate_places365_rows(
     args: argparse.Namespace,
     *,
-    images: list[DraftImage],
+    images: list[DraftImage | ManifestDraftImage],
     existing_ids: set[str],
     counts: dict[str, int],
     total_rows: int,
@@ -200,7 +283,7 @@ def generate_places365_rows(
         if args.limit_total and total_rows >= args.limit_total:
             break
 
-        row_id = build_row_id(image.slug, image.source_label, image.path)
+        row_id = row_id_for_image(image)
         if should_skip_draft_image(
             args=args,
             image=image,
@@ -228,9 +311,11 @@ def generate_places365_rows(
             row_id=row_id,
             generated_text=generated_text,
             dataset_prompt=dataset_prompt,
-            source="places365",
+            source="places365_manifest" if args.manifest else "places365",
             elapsed_seconds=elapsed,
         )
+        if getattr(image, "split", ""):
+            row["split"] = getattr(image, "split")
 
         append_jsonl(args.output, row)
 
@@ -268,7 +353,11 @@ def main() -> None:
     print(f"[INFO] output path: {args.output.resolve()}")
 
     slug_to_label, replace_labels = load_places365_categories(args)
-    images = iter_places365_images(args.input_dir, slug_to_label)
+    images = (
+        iter_manifest_images(args.manifest, slug_to_label)
+        if args.manifest
+        else iter_places365_images(args.input_dir, slug_to_label)
+    )
 
     if args.dry_run:
         print_dry_run_sample(args, images)
