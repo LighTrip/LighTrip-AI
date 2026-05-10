@@ -1,0 +1,133 @@
+{
+  "dataset": "Andron00e/Places365-custom",
+  "split": "train",
+  "output_dir": "data_places365_2",
+  "mapping_policy": "direct_only_high_confidence",
+  "categories": [
+    {
+      "label": "카페",
+      "slug": "cafe",
+      "places365": [
+        {"id": 99, "label": "coffee shop", "slug": "coffee_shop"}
+      ]
+    },
+    {
+      "label": "식당",
+      "slug": "restaurant",
+      "places365": [
+        {"id": 119, "label": "diner outdoor", "slug": "diner_outdoor"},
+        {"id": 139, "label": "fastfood restaurant", "slug": "fastfood_restaurant"},
+        {"id": 148, "label": "food court", "slug": "food_court"},
+        {"id": 267, "label": "pizzeria", "slug": "pizzeria"},
+        {"id": 284, "label": "restaurant", "slug": "restaurant"},
+        {"id": 286, "label": "restaurant patio", "slug": "restaurant_patio"}
+      ]
+    },
+    {
+      "label": "술집",
+      "slug": "bar",
+      "places365": [
+        {"id": 39, "label": "bar", "slug": "bar"},
+        {"id": 53, "label": "beer garden", "slug": "beer_garden"},
+        {"id": 54, "label": "beer hall", "slug": "beer_hall"},
+        {"id": 274, "label": "pub indoor", "slug": "pub_indoor"}
+      ]
+    },
+    {
+      "label": "문화",
+      "slug": "culture",
+      "places365": [
+        {"id": 5, "label": "amphitheater", "slug": "amphitheater"},
+        {"id": 19, "label": "art gallery", "slug": "art_gallery"},
+        {"id": 212, "label": "library indoor", "slug": "library_indoor"},
+        {"id": 235, "label": "movie theater indoor", "slug": "movie_theater_indoor"},
+        {"id": 236, "label": "museum indoor", "slug": "museum_indoor"},
+        {"id": 239, "label": "natural history museum", "slug": "natural_history_museum"},
+        {"id": 297, "label": "science museum", "slug": "science_museum"}
+      ]
+    },
+    {
+      "label": "쇼핑",
+      "slug": "shopping",
+      "places365": [
+        {"id": 46, "label": "bazaar indoor", "slug": "bazaar_indoor"},
+        {"id": 47, "label": "bazaar outdoor", "slug": "bazaar_outdoor"},
+        {"id": 96, "label": "clothing store", "slug": "clothing_store"},
+        {"id": 115, "label": "department store", "slug": "department_store"},
+        {"id": 146, "label": "flea market indoor", "slug": "flea_market_indoor"},
+        {"id": 160, "label": "general store indoor", "slug": "general_store_indoor"},
+        {"id": 162, "label": "gift shop", "slug": "gift_shop"},
+        {"id": 198, "label": "jewelry shop", "slug": "jewelry_shop"},
+        {"id": 222, "label": "market indoor", "slug": "market_indoor"},
+        {"id": 223, "label": "market outdoor", "slug": "market_outdoor"},
+        {"id": 300, "label": "shoe shop", "slug": "shoe_shop"},
+        {"id": 302, "label": "shopping mall indoor", "slug": "shopping_mall_indoor"},
+        {"id": 321, "label": "supermarket", "slug": "supermarket"},
+        {"id": 335, "label": "toyshop", "slug": "toyshop"}
+      ]
+    },
+    {
+      "label": "운동",
+      "slug": "exercise",
+      "places365": [
+        {"id": 24, "label": "athletic field outdoor", "slug": "athletic_field_outdoor"},
+        {"id": 42, "label": "baseball field", "slug": "baseball_field"},
+        {"id": 44, "label": "basketball court indoor", "slug": "basketball_court_indoor"},
+        {"id": 64, "label": "bowling alley", "slug": "bowling_alley"},
+        {"id": 65, "label": "boxing ring", "slug": "boxing_ring"},
+        {"id": 149, "label": "football field", "slug": "football_field"},
+        {"id": 164, "label": "golf course", "slug": "golf_course"},
+        {"id": 168, "label": "gymnasium indoor", "slug": "gymnasium_indoor"},
+        {"id": 188, "label": "ice skating rink indoor", "slug": "ice_skating_rink_indoor"},
+        {"id": 189, "label": "ice skating rink outdoor", "slug": "ice_skating_rink_outdoor"},
+        {"id": 225, "label": "martial arts gym", "slug": "martial_arts_gym"},
+        {"id": 305, "label": "ski slope", "slug": "ski_slope"},
+        {"id": 310, "label": "soccer field", "slug": "soccer_field"},
+        {"id": 325, "label": "swimming pool indoor", "slug": "swimming_pool_indoor"},
+        {"id": 326, "label": "swimming pool outdoor", "slug": "swimming_pool_outdoor"},
+        {"id": 351, "label": "volleyball court outdoor", "slug": "volleyball_court_outdoor"}
+      ]
+    },
+    {
+      "label": "공원",
+      "slug": "park",
+      "places365": [
+        {"id": 62, "label": "botanical garden", "slug": "botanical_garden"},
+        {"id": 153, "label": "formal garden", "slug": "formal_garden"},
+        {"id": 197, "label": "japanese garden", "slug": "japanese_garden"},
+        {"id": 254, "label": "park", "slug": "park"},
+        {"id": 265, "label": "picnic area", "slug": "picnic_area"},
+        {"id": 268, "label": "playground", "slug": "playground"},
+        {"id": 333, "label": "topiary garden", "slug": "topiary_garden"},
+        {"id": 364, "label": "zen garden", "slug": "zen_garden"}
+      ]
+    }
+  ],
+  "review_excluded": [
+    {"id": 31, "label": "bakery shop", "reason": "cafe_or_shopping"},
+    {"id": 75, "label": "cafeteria", "reason": "cafe_or_restaurant"},
+    {"id": 114, "label": "delicatessen", "reason": "restaurant_or_shopping"},
+    {"id": 120, "label": "dining hall", "reason": "restaurant_or_event_space"},
+    {"id": 121, "label": "dining room", "reason": "restaurant_or_home"},
+    {"id": 122, "label": "discotheque", "reason": "bar_or_culture"},
+    {"id": 185, "label": "ice cream parlor", "reason": "cafe_or_dessert_shop"},
+    {"id": 27, "label": "auditorium", "reason": "culture_or_event_space"},
+    {"id": 161, "label": "general store outdoor", "reason": "shopping_or_building_exterior"},
+    {"id": 213, "label": "library outdoor", "reason": "culture_or_building_exterior"},
+    {"id": 237, "label": "museum outdoor", "reason": "culture_or_building_exterior"},
+    {"id": 238, "label": "music studio", "reason": "culture_or_workspace"},
+    {"id": 209, "label": "lawn", "reason": "park_or_generic_green_space"},
+    {"id": 290, "label": "roof garden", "reason": "park_or_building_space"},
+    {"id": 301, "label": "shopfront", "reason": "shopping_or_street_exterior"},
+    {"id": 304, "label": "ski resort", "reason": "sports_or_travel"},
+    {"id": 312, "label": "stadium baseball", "reason": "sports_or_spectator_venue"},
+    {"id": 313, "label": "stadium football", "reason": "sports_or_spectator_venue"},
+    {"id": 314, "label": "stadium soccer", "reason": "sports_or_spectator_venue"},
+    {"id": 315, "label": "stage indoor", "reason": "culture_or_performance_detail"},
+    {"id": 316, "label": "stage outdoor", "reason": "culture_or_performance_detail"},
+    {"id": 322, "label": "sushi bar", "reason": "restaurant_or_bar"},
+    {"id": 324, "label": "swimming hole", "reason": "sports_or_nature"},
+    {"id": 353, "label": "water park", "reason": "sports_or_park"},
+    {"id": 358, "label": "wet bar", "reason": "bar_or_home_hotel"}
+  ]
+}
