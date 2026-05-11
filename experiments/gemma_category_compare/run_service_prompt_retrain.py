@@ -12,7 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SERVICE_GEMMA_ENV_DEFAULTS = {
     "GEMMA_MODEL_PATH": "models/gemma-4-E2B-it-Q4_K_S.gguf",
     "GEMMA_MMPROJ_PATH": "models/mmproj-F16.gguf",
-    "GEMMA_PROMPT_PATH": "configs/draft_prompt.txt",
+    "GEMMA_PROMPT_PATH": "configs/draft_prompt_boundary_v2.txt",
     "GEMMA_N_CTX": "2048",
     "GEMMA_MAX_TOKENS": "160",
     "GEMMA_TEMPERATURE": "0.2",
@@ -32,7 +32,7 @@ SERVICE_GEMMA_ENV_DEFAULTS = {
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "실제 서비스 프롬프트(configs/draft_prompt.txt)로 Places365 초안을 재생성하고 "
+            "경계 보강 프롬프트(configs/draft_prompt_boundary_v2.txt)로 Places365 초안을 재생성하고 "
             "TF-IDF + Linear SVM을 재학습하는 실험 runner입니다."
         )
     )
@@ -206,6 +206,8 @@ def compare_command(args: argparse.Namespace) -> list[str]:
         str(args.processed_dir / "test.jsonl"),
         "--classifier-artifact",
         str(args.artifact_dir / "linear_svm_tfidf.joblib"),
+        "--gemma-prompt",
+        "configs/draft_prompt_boundary_v2.txt",
         "--run-gemma-direct",
         "--run-split-pipeline",
         "--output-dir",

@@ -61,11 +61,18 @@ python3 experiments/gemma_category_compare/run_compare.py \
 
 ## Prompt
 
-Gemma 직접 분류 프롬프트는 `prompt_json_strict.txt`를 사용한다. 이 프롬프트는 기존 서비스의 `configs/draft_prompt.txt` 작성 규칙을 바탕으로 하되, 비교 실험을 위해 `draft`와 `category`를 함께 담은 JSON 객체를 출력하도록 확장했다.
+Gemma 초안 생성 기준 프롬프트는 기본적으로 `configs/draft_prompt_boundary_v2.txt`를 사용한다.
+
+| method | prompt |
+| --- | --- |
+| `gemma_direct` | `configs/draft_prompt_boundary_v2.txt`의 초안 작성 규칙을 기반으로, `draft`와 `category`를 함께 담은 JSON 객체를 출력하도록 런타임에서 확장한다. |
+| `split_pipeline` | `configs/draft_prompt_boundary_v2.txt`를 그대로 사용해 초안을 생성한다. |
+
+다른 프롬프트를 비교하려면 `--gemma-prompt`를 지정한다. `--direct-prompt`를 생략하면 Direct도 같은 `--gemma-prompt`를 기반으로 사용한다.
 
 ## Service-Prompt SVM Retraining
 
-`split_pipeline` 성능이 낮게 나올 때는 SVM이 학습한 초안 스타일과 실제 서비스 초안 스타일이 다를 수 있다. 아래 runner는 실제 서비스 프롬프트(`configs/draft_prompt.txt`)로 Places365 초안을 다시 생성한 뒤, 그 데이터로 Linear SVM을 재학습한다.
+`split_pipeline` 성능이 낮게 나올 때는 SVM이 학습한 초안 스타일과 실제 서비스 초안 스타일이 다를 수 있다. 아래 runner는 경계 보강 프롬프트(`configs/draft_prompt_boundary_v2.txt`)로 Places365 초안을 다시 생성한 뒤, 그 데이터로 Linear SVM을 재학습한다.
 
 먼저 1~2개만 명령 확인:
 
@@ -116,10 +123,10 @@ GPU 메모리가 불안하면 `--safe-hybrid`를 붙인다. 이 경우 속도는
 ```text
 models/gemma-4-E2B-it-Q4_K_S.gguf
 models/mmproj-F16.gguf
-configs/draft_prompt.txt
+configs/draft_prompt_boundary_v2.txt
 ```
 
-다른 모델 파일을 쓰거나 운영 환경 설정과 맞추려면 기존 API와 동일하게 환경변수를 직접 지정하면 된다. 직접 지정한 값은 자동 기본값보다 우선한다.
+다른 모델 파일을 쓰거나 운영 환경 설정과 맞추려면 기존 API와 동일하게 환경변수를 직접 지정하면 된다. 모델 관련 환경변수는 자동 기본값보다 우선한다. 프롬프트는 비교 일관성을 위해 `--gemma-prompt`가 `GEMMA_PROMPT_PATH`에 적용된다.
 
 ```text
 GEMMA_MODEL_PATH
