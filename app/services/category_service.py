@@ -15,8 +15,24 @@ def required_env(name: str) -> str:
     return value.strip()
 
 
+def optional_float_env(name: str) -> Optional[float]:
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        return None
+    try:
+        parsed = float(value.strip())
+    except ValueError as exc:
+        raise RuntimeError(f"{name} 환경변수는 float 값이어야 합니다: {value}") from exc
+    if not 0.0 <= parsed <= 1.0:
+        raise RuntimeError(f"{name} 환경변수는 0.0 이상 1.0 이하이어야 합니다: {value}")
+    return parsed
+
+
 CATEGORY_ARTIFACT_PATH: Final[Path] = Path(required_env("CATEGORY_ARTIFACT_PATH"))
 CATEGORY_UNKNOWN_LABEL: Final[str] = required_env("CATEGORY_UNKNOWN_LABEL")
+CATEGORY_UNKNOWN_THRESHOLD: Final[Optional[float]] = optional_float_env(
+    "CATEGORY_UNKNOWN_THRESHOLD"
+)
 
 _artifact: Optional[Dict[str, Any]] = None
 _pipeline: Optional[Any] = None
@@ -78,12 +94,18 @@ def load_category_model(artifact_path: Union[Path, str] = CATEGORY_ARTIFACT_PATH
     _metadata = loaded_artifact.get("metadata", {})
 
 
-def _max_probability(pipeline: Any, text: str) -> Optional[float]:
+def _probability_scores(pipeline: Any, text: str) -> Optional[Dict[str, float]]:
     if not hasattr(pipeline, "predict_proba"):
+        return None
+    if not hasattr(pipeline, "classes_"):
         return None
 
     probabilities = pipeline.predict_proba([text])
-    return float(probabilities[0].max())
+    classes = list(pipeline.classes_)
+    return {
+        str(label): float(probability)
+        for label, probability in zip(classes, probabilities[0])
+    }
 
 
 def _decision_scores(pipeline: Any, text: str) -> Optional[Dict[str, float]]:
@@ -121,6 +143,15 @@ def _apply_unknown_threshold(
     return raw_label
 
 
+def _resolve_unknown_threshold(unknown_threshold: Optional[float]) -> Optional[float]:
+    threshold = CATEGORY_UNKNOWN_THRESHOLD if unknown_threshold is None else unknown_threshold
+    if threshold is None:
+        return None
+    if not 0.0 <= threshold <= 1.0:
+        raise ValueError("unknown_threshold는 0.0 이상 1.0 이하이어야 합니다.")
+    return threshold
+
+
 def classify_text(
     text: str,
     unknown_threshold: Optional[float] = None,
@@ -134,10 +165,13 @@ def classify_text(
         raise ValueError("분류할 텍스트가 비어 있습니다.")
 
     raw_label = str(pipeline.predict([normalized_text])[0])
-    confidence = _max_probability(pipeline, normalized_text)
-    scores = _decision_scores(pipeline, normalized_text)
+    probability_scores = _probability_scores(pipeline, normalized_text)
+    confidence = max(probability_scores.values()) if probability_scores else None
+    decision_scores = _decision_scores(pipeline, normalized_text)
+    scores = decision_scores or probability_scores
     score = max(scores.values()) if scores else None
-    label = _apply_unknown_threshold(raw_label, confidence, unknown_threshold)
+    threshold = _resolve_unknown_threshold(unknown_threshold)
+    label = _apply_unknown_threshold(raw_label, confidence, threshold)
 
     return CategoryPrediction(
         label=label,

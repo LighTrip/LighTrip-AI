@@ -39,7 +39,7 @@ METRIC_KEYS = ("accuracy", "f1_macro")
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="카테고리 분류 모델 3종을 5-fold Stratified 교차 검증으로 비교합니다."
+        description="카테고리 분류 모델을 5-fold Stratified 교차 검증으로 비교합니다."
     )
     parser.add_argument(
         "--data",
@@ -145,7 +145,7 @@ def evaluate_model_cv(
     for fold_index, (train_index, test_index) in enumerate(splitter.split(x, y), start=1):
         pipeline = build_model(args, model_name)
         train_texts = x[train_index].tolist()
-        train_labels = y[train_index].tolist()
+        train_labels = y[train_index]
         test_texts = x[test_index].tolist()
         test_labels = y[test_index].tolist()
 

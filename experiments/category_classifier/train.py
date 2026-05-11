@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import joblib
+import numpy as np
 
 try:
     from _bootstrap import bootstrap_project_root
@@ -118,7 +119,8 @@ def main() -> None:
     labels = sorted(set(train_labels) | set(valid_labels) | set(test_labels))
     model_params = model_params_from_args(args)
     pipeline = build_pipeline_from_args(args, args.model)
-    pipeline.fit(train_texts, train_labels)
+    pipeline.fit(train_texts, np.asarray(train_labels, dtype=object))
+    confidence_type = "probability" if hasattr(pipeline, "predict_proba") else "decision_function"
 
     args.artifact_dir.mkdir(parents=True, exist_ok=True)
     args.report_dir.mkdir(parents=True, exist_ok=True)
@@ -166,6 +168,7 @@ def main() -> None:
                 "text_field": args.text_field,
                 "label_field": args.label_field,
                 "params": model_params,
+                "confidence_type": confidence_type,
             },
         },
         artifact_path,

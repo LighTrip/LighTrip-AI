@@ -130,6 +130,12 @@ CATEGORY_ARTIFACT_PATH
 CATEGORY_UNKNOWN_LABEL
 ```
 
+Optional environment variables:
+
+```text
+CATEGORY_UNKNOWN_THRESHOLD
+```
+
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
@@ -140,7 +146,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 | --- | --- | --- |
 | `GET` | `/health` | Gemma 모델과 카테고리 분류 모델 로드 상태 확인 |
 | `POST` | `/gemma/generate` | 이미지 기반 블로그 초안 생성 |
-| `POST` | `/pipeline/generate-and-classify` | 이미지 기반 블로그 초안 생성 후 TF-IDF + Linear SVM 카테고리 분류 |
+| `POST` | `/pipeline/generate-and-classify` | 이미지 기반 블로그 초안 생성 후 TF-IDF + calibrated Linear SVM 카테고리 분류 |
 
 ### Pipeline Request
 
@@ -150,7 +156,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 | --- | --- | --- | --- |
 | `image` | file | Yes | `jpg`, `png`, `webp` 이미지 |
 | `prompt` | string | No | 초안 생성에 반영할 사용자 요청 |
-| `unknown_threshold` | float | No | 확률 지원 모델에서 낮은 confidence를 `기타`로 처리할 기준값 |
+| `unknown_threshold` | float | No | 낮은 confidence를 `기타`로 처리할 기준값. 생략하면 `CATEGORY_UNKNOWN_THRESHOLD`를 사용 |
 
 ```bash
 curl -X POST "http://localhost:8000/pipeline/generate-and-classify" \
@@ -193,13 +199,13 @@ curl -X POST "http://localhost:8000/pipeline/generate-and-classify?debug=true" \
     "category": {
       "label": "카페",
       "raw_label": "카페",
-      "confidence": null,
-      "score": 0.5363,
+      "confidence": 0.7421,
+      "score": 0.7421,
       "scores": {
-        "카페": 0.5363,
-        "식당": -1.0874
+        "카페": 0.7421,
+        "식당": 0.1084
       },
-      "model": "linear_svm"
+      "model": "calibrated_linear_svm"
     },
     "filename": "sample.jpg",
     "prompt": "따뜻한 일상 기록 느낌으로 작성해줘",
@@ -208,7 +214,7 @@ curl -X POST "http://localhost:8000/pipeline/generate-and-classify?debug=true" \
 }
 ```
 
-Linear SVM은 `predict_proba`를 제공하지 않기 때문에 `confidence`는 `null`이며, 대신 `decision_function` 기반 `score`와 `scores`를 반환합니다.
+`calibrated_linear_svm` artifact는 `predict_proba` 기반 confidence를 반환하며, confidence가 threshold보다 낮으면 응답 카테고리를 `기타`로 바꿉니다. 기본 `linear_svm` artifact는 `predict_proba`를 제공하지 않으므로 fallback 운영에는 calibrated artifact를 사용합니다.
 
 ## Places365 Draft Dataset Pipeline
 
