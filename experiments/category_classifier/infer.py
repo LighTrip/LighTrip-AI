@@ -13,8 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from experiments.category_classifier.src.data import load_texts_from_jsonl
-
-SUPPORTED_MODELS = ("nb", "logistic_regression", "linear_svm")
+from experiments.category_classifier.src.models import SUPPORTED_MODELS
 
 
 def parse_args() -> argparse.Namespace:

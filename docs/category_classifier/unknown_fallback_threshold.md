@@ -1,0 +1,83 @@
+# Category Classifier Unknown Fallback
+
+## 결론
+
+`data_places365_2/manual_review_full/accepted_drafts.jsonl` 기반 split으로 `calibrated_linear_svm`을 학습하고, validation 기준 threshold를 튜닝했습니다.
+
+- Artifact: `experiments/category_classifier/artifacts/places365_2_manual_full_calibrated/calibrated_linear_svm_tfidf.joblib`
+- Unknown label: `기타`
+- Selected threshold: `0.49`
+- Selection policy: validation coverage `0.90` 이상에서 known accuracy, wrong capture rate, 낮은 correct reject rate 순으로 선택
+
+## Calibrated Model
+
+Linear SVM 기본 모델은 `predict_proba`를 제공하지 않아 confidence threshold fallback을 직접 적용할 수 없습니다. 따라서 `LinearSVC`에 `CalibratedClassifierCV(method="sigmoid", cv=5)`를 적용한 artifact를 별도로 생성했습니다.
+
+```bash
+python3 experiments/category_classifier/train.py \
+  --model calibrated_linear_svm \
+  --train data_places365_2/processed/train.jsonl \
+  --valid data_places365_2/processed/valid.jsonl \
+  --test data_places365_2/processed/test.jsonl \
+  --artifact-dir experiments/category_classifier/artifacts/places365_2_manual_full_calibrated \
+  --report-dir experiments/category_classifier/reports/places365_2_manual_full_calibrated \
+  --max-iter 2000 \
+  --class-weight balanced \
+  --calibration-method sigmoid \
+  --calibration-cv 5
+```
+
+| Split | Accuracy | Macro F1 | Weighted F1 |
+| --- | ---: | ---: | ---: |
+| Validation | 0.8289 | 0.8292 | 0.8287 |
+| Test | 0.8643 | 0.8500 | 0.8633 |
+
+## Threshold Tuning
+
+```bash
+python3 experiments/category_classifier/tune_unknown_threshold.py \
+  --model-path experiments/category_classifier/artifacts/places365_2_manual_full_calibrated/calibrated_linear_svm_tfidf.joblib \
+  --valid data_places365_2/processed/valid.jsonl \
+  --test data_places365_2/processed/test.jsonl \
+  --excluded data_places365_2/manual_review_full/excluded_drafts.jsonl \
+  --report-dir experiments/category_classifier/reports/places365_2_manual_full_calibrated/unknown_threshold \
+  --min-coverage 0.9 \
+  --threshold-min 0.0 \
+  --threshold-max 1.0 \
+  --threshold-step 0.01
+```
+
+| Split | Threshold | Fallback Rate | Coverage | Raw Accuracy | Known Accuracy | Wrong Capture Rate |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Validation | 0.49 | 0.0914 | 0.9086 | 0.8289 | 0.8831 | 0.3793 |
+| Test | 0.49 | 0.0649 | 0.9351 | 0.8643 | 0.8959 | 0.2826 |
+
+`accuracy_with_unknown_as_wrong`는 validation `0.8024`, test `0.8378`입니다. 이는 `기타`를 정답 실패로 계산한 보수적 지표이고, 서비스 관점에서는 known prediction만 반환한 경우의 `known_accuracy`를 함께 봅니다.
+
+## Excluded Draft Check
+
+수동 검수 제외 샘플은 학습 라벨로 사용하지 않고, 모호한 텍스트가 낮은 confidence로 잡히는지 확인하는 reject-set 용도로만 사용했습니다.
+
+- 분석 가능 excluded rows: `2,335`
+- Fallback rows: `554`
+- Fallback rate: `0.2373`
+
+## Service 적용
+
+```bash
+CATEGORY_ARTIFACT_PATH=experiments/category_classifier/artifacts/places365_2_manual_full_calibrated/calibrated_linear_svm_tfidf.joblib
+CATEGORY_UNKNOWN_LABEL=기타
+CATEGORY_UNKNOWN_THRESHOLD=0.49
+```
+
+요청 form의 `unknown_threshold`가 전달되면 환경변수 기본값보다 우선합니다.
+
+## 산출물
+
+- `experiments/category_classifier/reports/places365_2_manual_full_calibrated/calibrated_linear_svm_metrics.json`
+- `experiments/category_classifier/reports/places365_2_manual_full_calibrated/unknown_threshold/selected_threshold.json`
+- `experiments/category_classifier/reports/places365_2_manual_full_calibrated/unknown_threshold/threshold_tuning_metrics.json`
+- `experiments/category_classifier/reports/places365_2_manual_full_calibrated/unknown_threshold/valid_threshold_summary.csv`
+- `experiments/category_classifier/reports/places365_2_manual_full_calibrated/unknown_threshold/valid_fallback_candidates.jsonl`
+- `experiments/category_classifier/reports/places365_2_manual_full_calibrated/unknown_threshold/test_fallback_candidates.jsonl`
+- `experiments/category_classifier/reports/places365_2_manual_full_calibrated/unknown_threshold/excluded_fallback_candidates.jsonl`

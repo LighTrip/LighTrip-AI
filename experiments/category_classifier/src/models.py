@@ -5,6 +5,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import MultinomialNB
@@ -13,11 +14,12 @@ from sklearn.svm import LinearSVC
 
 from experiments.category_classifier.src.preprocess import load_stopwords, tokenize_ko
 
-SUPPORTED_MODELS = ("nb", "logistic_regression", "linear_svm")
+SUPPORTED_MODELS = ("nb", "logistic_regression", "linear_svm", "calibrated_linear_svm")
 MODEL_DISPLAY_NAMES = {
     "nb": "Naive Bayes",
     "logistic_regression": "Logistic Regression",
     "linear_svm": "Linear SVM",
+    "calibrated_linear_svm": "Calibrated Linear SVM",
 }
 
 
@@ -143,6 +145,50 @@ def build_tfidf_linear_svm_pipeline(
     )
 
 
+def build_tfidf_calibrated_linear_svm_pipeline(
+    *,
+    stopwords_path: Path | None = None,
+    max_features: int | None = 20000,
+    min_df: int = 1,
+    max_df: float = 0.95,
+    ngram_max: int = 2,
+    c: float = 1.0,
+    max_iter: int = 1000,
+    class_weight: str | None = None,
+    calibration_method: str = "sigmoid",
+    calibration_cv: int = 5,
+) -> Pipeline:
+    base_estimator = LinearSVC(
+        C=c,
+        dual=True,
+        max_iter=max_iter,
+        class_weight=class_weight,
+    )
+
+    return Pipeline(
+        [
+            (
+                "tfidf",
+                build_tfidf_vectorizer(
+                    stopwords_path=stopwords_path,
+                    max_features=max_features,
+                    min_df=min_df,
+                    max_df=max_df,
+                    ngram_max=ngram_max,
+                ),
+            ),
+            (
+                "classifier",
+                CalibratedClassifierCV(
+                    estimator=base_estimator,
+                    method=calibration_method,
+                    cv=calibration_cv,
+                ),
+            ),
+        ]
+    )
+
+
 def build_pipeline(model_name: str, **kwargs: Any) -> Pipeline:
     if model_name == "nb":
         return build_tfidf_nb_pipeline(
@@ -175,6 +221,19 @@ def build_pipeline(model_name: str, **kwargs: Any) -> Pipeline:
             c=kwargs.get("c", 1.0),
             max_iter=kwargs.get("max_iter", 1000),
             class_weight=kwargs.get("class_weight"),
+        )
+    if model_name == "calibrated_linear_svm":
+        return build_tfidf_calibrated_linear_svm_pipeline(
+            stopwords_path=kwargs.get("stopwords_path"),
+            max_features=kwargs.get("max_features", 20000),
+            min_df=kwargs.get("min_df", 1),
+            max_df=kwargs.get("max_df", 0.95),
+            ngram_max=kwargs.get("ngram_max", 2),
+            c=kwargs.get("c", 1.0),
+            max_iter=kwargs.get("max_iter", 1000),
+            class_weight=kwargs.get("class_weight"),
+            calibration_method=kwargs.get("calibration_method", "sigmoid"),
+            calibration_cv=kwargs.get("calibration_cv", 5),
         )
     raise ValueError(f"지원하지 않는 모델입니다: {model_name}")
 
@@ -220,6 +279,18 @@ def add_model_hyperparameter_arguments(parser: argparse.ArgumentParser) -> None:
         choices=["balanced"],
         help="Logistic Regression/Linear SVM class_weight 옵션입니다.",
     )
+    parser.add_argument(
+        "--calibration-method",
+        choices=["sigmoid", "isotonic"],
+        default="sigmoid",
+        help="Calibrated Linear SVM의 probability calibration 방법입니다.",
+    )
+    parser.add_argument(
+        "--calibration-cv",
+        type=int,
+        default=5,
+        help="Calibrated Linear SVM 내부 교차 검증 fold 수입니다.",
+    )
 
 
 def model_params_from_args(args: argparse.Namespace) -> dict[str, Any]:
@@ -233,6 +304,8 @@ def model_params_from_args(args: argparse.Namespace) -> dict[str, Any]:
         "max_iter": args.max_iter,
         "solver": args.solver,
         "class_weight": args.class_weight,
+        "calibration_method": args.calibration_method,
+        "calibration_cv": args.calibration_cv,
     }
 
 
