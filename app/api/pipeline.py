@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Dict, Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.services.blog_pipeline_service import generate_draft_and_classify
@@ -20,43 +19,19 @@ router = APIRouter(prefix="/pipeline", tags=["pipeline"])
 logger = logging.getLogger(__name__)
 
 
-class CategoryResponse(BaseModel):
-    label: str
-    raw_label: str
-    confidence: Optional[float] = None
-    score: Optional[float] = None
-    scores: Optional[Dict[str, float]] = None
-    model: Optional[str] = None
-
-
-class PipelineDataResponse(BaseModel):
-    generated_text: str
+class PipelineResponse(BaseModel):
+    draft: str
     category: str
 
 
-class PipelineDebugResponse(BaseModel):
-    category: CategoryResponse
-    filename: Optional[str] = None
-    prompt: str
-    elapsed_seconds: float
-
-
-class PipelineResponse(BaseModel):
-    success: bool
-    data: PipelineDataResponse
-    debug: Optional[PipelineDebugResponse] = None
-
-
 @router.post(
-    "/generate-and-classify",
+    "/generate",
     response_model=PipelineResponse,
     response_model_exclude_none=True,
 )
-async def generate_and_classify(
+async def generate(
     image: UploadFile = File(...),
-    prompt: str = Form(""),
-    unknown_threshold: Optional[float] = Form(None),
-    debug: bool = Query(False),
+    text: str = Form(""),
 ):
     llm = get_llm()
     if llm is None or not is_model_loaded():
@@ -80,28 +55,21 @@ async def generate_and_classify(
             llm=llm,
             image_bytes=image_bytes,
             filename=image.filename or "upload.jpg",
-            user_prompt=prompt,
-            unknown_threshold=unknown_threshold,
+            user_prompt=text,
         )
         elapsed = time.perf_counter() - start_time
-
-        response = {
-            "success": True,
-            "data": {
-                "generated_text": result.generated_text,
-                "category": result.category.label,
-            },
+        logger.info(
+            "Pipeline inference completed: filename=%s category=%s source=%s fallback_reason=%s elapsed=%.2f",
+            image.filename,
+            result.category,
+            result.category_source,
+            result.fallback_reason,
+            elapsed,
+        )
+        return {
+            "draft": result.draft,
+            "category": result.category,
         }
-
-        if debug:
-            response["debug"] = {
-                "category": result.category.to_dict(),
-                "filename": image.filename,
-                "prompt": prompt,
-                "elapsed_seconds": round(elapsed, 2),
-            }
-
-        return response
 
     except HTTPException:
         raise
