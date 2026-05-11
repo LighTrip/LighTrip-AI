@@ -2,7 +2,7 @@
 
 한국항공대학교 산학 프로젝트 **LighTrip AI** 레포지토리입니다.
 
-LighTrip AI는 사용자 이미지로부터 한국어 블로그 스타일 초안을 생성하고, 생성된 초안을 서비스 카테고리로 분류하는 AI 기능을 제공합니다.
+LighTrip AI는 사용자 이미지로부터 한국어 블로그 스타일 초안과 서비스 카테고리를 생성하는 AI 기능을 제공합니다. 기본 경로는 Gemma Direct이며, 카테고리 출력이 비정상일 때 calibrated SVM fallback을 사용합니다.
 
 ## Developer
 
@@ -14,89 +14,13 @@ LighTrip AI는 사용자 이미지로부터 한국어 블로그 스타일 초안
 
 | Feature | Model / Method | Description |
 | --- | --- | --- |
-| Image -> Draft Generation | Gemma 4 E2B (GGUF) | 사용자 이미지와 프롬프트를 기반으로 한국어 블로그 스타일 초안(2-3줄) 생성 |
-| Category Classification | TF-IDF + Linear SVM | 생성된 한국어 블로그 초안을 서비스 카테고리로 분류 |
+| Image -> Draft + Category | Gemma 4 E2B (GGUF) | 사용자 이미지와 선택 입력 텍스트를 기반으로 한국어 블로그 스타일 초안과 카테고리 생성 |
+| Category Fallback | TF-IDF + calibrated Linear SVM | Gemma가 카테고리를 누락하거나, 비우거나, 허용되지 않은 카테고리를 출력한 경우 fallback 분류 |
 | Places365 Draft Dataset Pipeline | Places365 + Gemma draft generation | Places365 이미지를 카테고리 분류 학습용 JSONL 데이터셋으로 변환 |
-
-## Project Structure
-
-```text
-LighTrip-AI/
-├── app/
-│   ├── api/
-│   │   └── gemma.py
-│   ├── services/
-│   │   └── gemma_service.py
-│   └── main.py
-├── configs/
-│   ├── dataset_categories.json
-│   └── places365_categories.json
-├── data_places365/
-│   ├── 카페/
-│   ├── 식당/
-│   ├── 술집/
-│   ├── 문화/
-│   ├── 운동/
-│   ├── 쇼핑/
-│   ├── 공원/
-│   ├── interim/
-│   └── processed/
-├── docs/
-│   └── category_classifier/
-│       └── cv_5fold/
-├── experiments/
-│   ├── category_classifier/
-│   │   ├── src/
-│   │   ├── compare_cv.py
-│   │   ├── infer.py
-│   │   ├── train.py
-│   │   └── stopwords_ko.txt
-│   └── gemma/
-│       └── v1_prompt.py
-├── scripts/
-│   └── dataset/
-│       ├── collect_places365.py
-│       ├── generate_places365_drafts.py
-│       ├── split_places365_dataset.py
-│       └── validate_drafts.py
-├── requirements-classifier.txt
-├── requirements-dataset.txt
-└── README.md
-```
-
-| Path | Description |
-| --- | --- |
-| `app/` | FastAPI 기반 AI serving 코드 |
-| `configs/` | 카테고리 매핑, Places365 설정, 초안 생성 프롬프트 |
-| `data_places365/` | Places365 기반 이미지 원천, 중간 산출물, train/valid/test JSONL |
-| `docs/category_classifier/cv_5fold/` | 5-fold 모델 비교 보고서, CSV, 그래프 산출물 |
-| `experiments/category_classifier/` | TF-IDF 카테고리 분류 학습, 추론, 교차검증 실험 코드 |
-| `experiments/gemma/` | Gemma 초안 생성 실험 코드 |
-| `scripts/dataset/` | 데이터 수집, 초안 생성, split, 검증 스크립트 |
-
-## Category Classification
-
-### Final Model
-
-- Selected model: **TF-IDF + Linear SVM**
-- Service labels: 카페, 식당, 술집, 문화, 운동, 쇼핑, 공원, 기타
-- Training/evaluation labels: 카페, 식당, 술집, 문화, 운동, 쇼핑, 공원
-- Model selection report: `docs/category_classifier/cv_5fold/model_selection_5fold.md`
-
-### Model Selection Summary
-
-Naive Bayes, Logistic Regression, Linear SVM을 동일 데이터셋 기준으로 비교했고, 5-fold Stratified 교차 검증 결과 **Linear SVM**을 최종 모델로 선정했습니다.
-
-| Metric | Linear SVM |
-| --- | --- |
-| Macro F1 | `0.9281 ± 0.0213` |
-| Accuracy | `0.9282 ± 0.0213` |
-
-선정 기준은 Macro F1 평균을 최우선으로 두고, Accuracy 평균, fold별 표준편차, 추론 속도와 학습 시간을 운영 관점의 보조 지표로 함께 고려했습니다.
 
 ## API Serving
 
-FastAPI 앱은 기존 Gemma 초안 생성 API와 통합 AI 파이프라인 API를 함께 제공합니다.
+FastAPI 앱은 Gemma Direct 기반 통합 AI 파이프라인 API를 제공합니다.
 
 ### Install
 
@@ -136,6 +60,15 @@ Optional environment variables:
 CATEGORY_UNKNOWN_THRESHOLD
 ```
 
+Fallback 운영에는 calibrated SVM artifact를 사용합니다.
+
+```bash
+export CATEGORY_ARTIFACT_PATH=experiments/category_classifier/artifacts/places365_2_manual_full_calibrated/calibrated_linear_svm_tfidf.joblib
+export CATEGORY_UNKNOWN_LABEL=기타
+```
+
+Gemma Direct는 기본 초안 프롬프트에 JSON 출력 규칙을 추가하므로, `draft_prompt_boundary_v2.txt` 사용 시 `GEMMA_N_CTX`는 최소 `2048` 이상을 권장합니다.
+
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
@@ -144,9 +77,9 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/health` | Gemma 모델과 카테고리 분류 모델 로드 상태 확인 |
-| `POST` | `/gemma/generate` | 이미지 기반 블로그 초안 생성 |
-| `POST` | `/pipeline/generate-and-classify` | 이미지 기반 블로그 초안 생성 후 TF-IDF + calibrated Linear SVM 카테고리 분류 |
+| `GET` | `/` | 서버 실행 상태 확인 |
+| `GET` | `/health` | Gemma 모델과 카테고리 fallback 모델 로드 상태 확인 |
+| `POST` | `/pipeline/generate` | Gemma Direct로 초안과 카테고리를 생성하고, 카테고리 이상 출력 시 calibrated Linear SVM fallback 적용 |
 
 ### Pipeline Request
 
@@ -154,139 +87,213 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `image` | file | Yes | `jpg`, `png`, `webp` 이미지 |
-| `prompt` | string | No | 초안 생성에 반영할 사용자 요청 |
-| `unknown_threshold` | float | No | 낮은 confidence를 `기타`로 처리할 기준값. 생략하면 `CATEGORY_UNKNOWN_THRESHOLD`를 사용 |
+| `image` | File | Yes | `jpg`, `jpeg`, `png`, `webp` 이미지. OpenAPI/Swagger에서는 `string($binary)`로 표시될 수 있음 |
+| `text` | string | No | 초안 생성에 반영할 사용자 요청 |
 
 ```bash
-curl -X POST "http://localhost:8000/pipeline/generate-and-classify" \
+curl -X POST "http://localhost:8000/pipeline/generate" \
   -F "image=@sample.jpg" \
-  -F "prompt=따뜻한 일상 기록 느낌으로 작성해줘"
+  -F "text=따뜻한 일상 기록 느낌으로 작성해줘"
 ```
 
-디버그 정보가 필요할 때는 쿼리 파라미터로 `debug=true`를 추가합니다.
-
-```bash
-curl -X POST "http://localhost:8000/pipeline/generate-and-classify?debug=true" \
-  -F "image=@sample.jpg" \
-  -F "prompt=따뜻한 일상 기록 느낌으로 작성해줘"
-```
+SVM fallback threshold는 API 입력으로 받지 않고 `CATEGORY_UNKNOWN_THRESHOLD` 환경변수로 관리합니다. fallback 여부와 SVM 진단 정보는 서버 로그에만 기록됩니다.
 
 ### Pipeline Response
 
-기본 응답은 서비스 연동에 필요한 초안과 카테고리만 반환합니다.
+응답은 서비스 연동에 필요한 초안과 카테고리만 반환합니다.
 
 ```json
 {
-  "success": true,
-  "data": {
-    "generated_text": "오늘은 커피 향이 유난히 좋았다.\n잠깐 쉬어가는 시간이 이렇게 반가울 줄 몰랐다.",
-    "category": "카페"
-  }
+  "draft": "오늘은 커피 향이 유난히 좋았다.\n잠깐 쉬어가는 시간이 이렇게 반가울 줄 몰랐다.",
+  "category": "카페"
 }
 ```
 
-`debug=true`일 때만 분류 score, 모델명, 처리 시간 등의 진단 정보를 함께 반환합니다.
+운영 label set은 `카페, 식당, 술집, 문화, 운동, 쇼핑, 공원, 기타`입니다. Gemma가 `category`를 비우거나, `category` 필드를 누락하거나, 허용 label set 밖의 값을 출력하면 SVM fallback 결과를 최종 `category`로 반환합니다.
 
-```json
-{
-  "success": true,
-  "data": {
-    "generated_text": "오늘은 커피 향이 유난히 좋았다.\n잠깐 쉬어가는 시간이 이렇게 반가울 줄 몰랐다.",
-    "category": "카페"
-  },
-  "debug": {
-    "category": {
-      "label": "카페",
-      "raw_label": "카페",
-      "confidence": 0.7421,
-      "score": 0.7421,
-      "scores": {
-        "카페": 0.7421,
-        "식당": 0.1084
-      },
-      "model": "calibrated_linear_svm"
-    },
-    "filename": "sample.jpg",
-    "prompt": "따뜻한 일상 기록 느낌으로 작성해줘",
-    "elapsed_seconds": 3.42
-  }
-}
+`calibrated_linear_svm` artifact는 fallback 발생 시 `predict_proba` 기반 confidence를 반환하며, confidence가 threshold보다 낮으면 최종 카테고리를 `기타`로 바꿉니다. 기본 `linear_svm` artifact는 `predict_proba`를 제공하지 않으므로 fallback 운영에는 calibrated artifact를 사용합니다.
+
+## Project Structure
+
+```text
+LighTrip-AI/
+├── app/
+│   ├── api/
+│   │   ├── gemma.py
+│   │   └── pipeline.py
+│   ├── services/
+│   │   ├── blog_pipeline_service.py
+│   │   ├── category_policy.py
+│   │   ├── category_service.py
+│   │   └── gemma_service.py
+│   └── main.py
+├── configs/
+│   ├── dataset_categories.json
+│   ├── places365_categories.json
+│   └── places365_categories_v2.json
+├── data_places365_2/
+│   ├── 카페/
+│   ├── 식당/
+│   ├── 술집/
+│   ├── 문화/
+│   ├── 운동/
+│   ├── 쇼핑/
+│   ├── 공원/
+│   ├── final_filtered/
+│   ├── interim/
+│   ├── manual_review_full/
+│   ├── processed/
+│   └── splits/
+├── docs/
+│   └── category_classifier/
+│       └── cv_5fold/
+├── experiments/
+│   ├── category_classifier/
+│   │   ├── src/
+│   │   ├── compare_cv.py
+│   │   ├── infer.py
+│   │   ├── train.py
+│   │   └── stopwords_ko.txt
+│   └── gemma/
+│       └── v1_prompt.py
+├── scripts/
+│   └── dataset/
+│       ├── collect_places365.py
+│       ├── generate_places365_drafts.py
+│       ├── split_places365_dataset.py
+│       └── validate_drafts.py
+├── requirements-classifier.txt
+├── requirements-dataset.txt
+└── README.md
 ```
 
-`calibrated_linear_svm` artifact는 `predict_proba` 기반 confidence를 반환하며, confidence가 threshold보다 낮으면 응답 카테고리를 `기타`로 바꿉니다. 기본 `linear_svm` artifact는 `predict_proba`를 제공하지 않으므로 fallback 운영에는 calibrated artifact를 사용합니다.
+| Path | Description |
+| --- | --- |
+| `app/` | FastAPI 기반 AI serving 코드 |
+| `configs/` | 카테고리 매핑, Places365 설정, 초안 생성 프롬프트 |
+| `data_places365_2/` | Places365 v2 기반 이미지 원천, manual review 산출물, train/valid/test JSONL |
+| `docs/category_classifier/cv_5fold/` | 5-fold 모델 비교 보고서, CSV, 그래프 산출물 |
+| `experiments/category_classifier/` | TF-IDF 카테고리 분류 학습, 추론, 교차검증 실험 코드 |
+| `experiments/gemma/` | Gemma 초안 생성 실험 코드 |
+| `scripts/dataset/` | 데이터 수집, 초안 생성, split, 검증 스크립트 |
 
-## Places365 Draft Dataset Pipeline
+## Category Classification
+
+### Fallback Model
+
+- Fallback model: **TF-IDF + calibrated Linear SVM**
+- Service labels: 카페, 식당, 술집, 문화, 운동, 쇼핑, 공원, 기타
+- Training/evaluation labels: 카페, 식당, 술집, 문화, 운동, 쇼핑, 공원
+- Model selection report: `docs/category_classifier/cv_5fold/model_selection_5fold.md`
+- Runtime artifact: `experiments/category_classifier/artifacts/places365_2_manual_full_calibrated/calibrated_linear_svm_tfidf.joblib`
+- Training data: `data_places365_2/processed/train.jsonl` (`2747` rows)
+- Validation data: `data_places365_2/processed/valid.jsonl` (`339` rows)
+- Test data: `data_places365_2/processed/test.jsonl` (`339` rows)
+
+### Model Selection Summary
+
+Naive Bayes, Logistic Regression, Linear SVM을 동일 데이터셋 기준으로 비교했고, 5-fold Stratified 교차 검증 결과 **Linear SVM**을 fallback 모델 계열로 선정했습니다. 운영에서는 confidence 기반 `기타` 처리를 위해 calibrated artifact를 사용합니다.
+
+| Metric | Calibrated Linear SVM |
+| --- | --- |
+| Test Accuracy | `0.8643` |
+| Test Macro F1 | `0.8500` |
+| Valid Accuracy | `0.8289` |
+| Valid Macro F1 | `0.8292` |
+
+선정 기준은 Macro F1 평균을 최우선으로 두고, Accuracy 평균, fold별 표준편차, 추론 속도와 학습 시간을 운영 관점의 보조 지표로 함께 고려했습니다.
+
+## Places365 v2 Dataset Pipeline
 
 ### Goal
 
-Places365 이미지를 LighTrip 서비스 카테고리에 매핑한 뒤, Gemma 기반 한국어 블로그 초안을 생성해 카테고리 분류 학습용 JSONL 데이터셋을 구축합니다.
+Places365 이미지를 LighTrip 서비스 카테고리에 매핑한 뒤, manual review와 filtering을 거쳐 Gemma 기반 한국어 블로그 초안을 생성하고 카테고리 fallback 학습용 JSONL 데이터셋을 구축합니다.
 
 ### Dataset Policy
 
 - Data source: Places365 scene categories mapped to LighTrip service categories
+- Dataset root: `data_places365_2/`
+- Mapping config: `configs/places365_categories_v2.json`
 - Dataset labels: 카페, 식당, 술집, 문화, 운동, 쇼핑, 공원
 - Service inference labels: 카페, 식당, 술집, 문화, 운동, 쇼핑, 공원, 기타
-- Recommended target: 서비스 카테고리별 180개 이상, 총 1,000개 이상
-- Draft prompt policy: 카테고리 분류 학습 품질을 높이기 위해 각 라벨의 약한 힌트를 Gemma4 프롬프트에 자동 추가
+- Processed split: `train=2747`, `valid=339`, `test=339`
+- Draft prompt policy: `configs/draft_prompt_boundary_v2.txt` 기준의 카테고리 경계 규칙을 반영
 
 서비스 API의 기본 프롬프트는 데이터셋 생성용 힌트와 분리해 유지합니다.
 
 ### Dataset Structure
 
 ```text
-data_places365/
+data_places365_2/
 ├── 카페/
 │   ├── coffee_shop/
-│   └── ice_cream_parlor/
 ├── 식당/
-│   ├── cafeteria/
+│   ├── diner_outdoor/
 │   ├── fastfood_restaurant/
 │   ├── food_court/
 │   ├── pizzeria/
 │   ├── restaurant/
-│   └── sushi_bar/
+│   └── restaurant_patio/
 ├── 술집/
 │   ├── bar/
 │   ├── beer_garden/
 │   ├── beer_hall/
-│   ├── discotheque/
-│   └── wet_bar/
+│   └── pub_indoor/
 ├── 문화/
 │   ├── amphitheater/
 │   ├── art_gallery/
-│   ├── art_school/
-│   ├── art_studio/
-│   ├── artists_loft/
-│   ├── auditorium/
-│   ├── music_studio/
+│   ├── library_indoor/
+│   ├── movie_theater_indoor/
+│   ├── museum_indoor/
 │   ├── natural_history_museum/
 │   └── science_museum/
 ├── 운동/
+│   ├── athletic_field_outdoor/
 │   ├── baseball_field/
+│   ├── basketball_court_indoor/
 │   ├── bowling_alley/
 │   ├── boxing_ring/
 │   ├── football_field/
 │   ├── golf_course/
+│   ├── gymnasium_indoor/
+│   ├── ice_skating_rink_indoor/
+│   ├── ice_skating_rink_outdoor/
 │   ├── martial_arts_gym/
-│   ├── racecourse/
-│   ├── ski_resort/
 │   ├── ski_slope/
-│   └── soccer_field/
+│   ├── soccer_field/
+│   ├── swimming_pool_indoor/
+│   ├── swimming_pool_outdoor/
+│   └── volleyball_court_outdoor/
 ├── 쇼핑/
-│   ├── bookstore/
+│   ├── bazaar_indoor/
+│   ├── bazaar_outdoor/
 │   ├── clothing_store/
 │   ├── department_store/
+│   ├── flea_market_indoor/
+│   ├── general_store_indoor/
 │   ├── gift_shop/
-│   └── shoe_shop/
+│   ├── jewelry_shop/
+│   ├── market_indoor/
+│   ├── market_outdoor/
+│   ├── shoe_shop/
+│   ├── shopping_mall_indoor/
+│   ├── supermarket/
+│   └── toyshop/
 ├── 공원/
 │   ├── botanical_garden/
 │   ├── formal_garden/
 │   ├── japanese_garden/
-│   ├── lawn/
 │   ├── park/
 │   ├── picnic_area/
-│   └── playground/
+│   ├── playground/
+│   ├── topiary_garden/
+│   └── zen_garden/
+├── final_filtered/
+├── manual_review_full/
+├── splits/
+│   ├── train.jsonl
+│   ├── valid.jsonl
+│   └── test.jsonl
 ├── processed/
 │   ├── train.jsonl
 │   ├── valid.jsonl

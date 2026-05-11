@@ -23,7 +23,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="LighTrip AI API",
-    description="이미지 기반 블로그 초안 생성 및 카테고리 분류 API",
+    description="이미지 기반 블로그 초안 및 카테고리 생성 API",
     version="1.0.0",
     lifespan=lifespan,
 )
