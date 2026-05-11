@@ -29,6 +29,7 @@ from experiments.category_classifier.src.evaluate import (
 
 
 DEFAULT_DIRECT_LABELS = ("카페", "식당", "술집", "문화", "운동", "쇼핑", "공원", "기타")
+DEFAULT_GEMMA_PROMPT = Path("configs/draft_prompt_boundary_v2.txt")
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 JSON_OBJECT_PATTERN = re.compile(r"\{.*\}", re.DOTALL)
 CATEGORY_LINE_PATTERN = re.compile(r"(?:카테고리|category)\s*[:：]\s*([^\n\r]+)", re.IGNORECASE)
@@ -36,7 +37,7 @@ DRAFT_LINE_PATTERN = re.compile(r"(?:초안|draft)\s*[:：]\s*(.+)", re.IGNORECA
 GEMMA_ENV_DEFAULTS = {
     "GEMMA_MODEL_PATH": "models/gemma-4-E2B-it-Q4_K_S.gguf",
     "GEMMA_MMPROJ_PATH": "models/mmproj-F16.gguf",
-    "GEMMA_PROMPT_PATH": "configs/draft_prompt.txt",
+    "GEMMA_PROMPT_PATH": str(DEFAULT_GEMMA_PROMPT),
     "GEMMA_N_CTX": "4096",
     "GEMMA_MAX_TOKENS": "256",
     "GEMMA_TEMPERATURE": "0.2",
@@ -89,13 +90,22 @@ def parse_args() -> argparse.Namespace:
         default=",".join(DEFAULT_DIRECT_LABELS),
         help=(
             "Gemma 직접 분류 프롬프트에서 허용할 label 목록입니다. "
-            "현재 Places365의 공원까지 비교하려면 카페,식당,술집,문화,운동,쇼핑,공원,기타 처럼 지정하세요."
+            "기본값은 기타 포함이며, 기타 제외 closed-set 비교는 카페,식당,술집,문화,운동,쇼핑,공원 처럼 지정하세요."
         ),
     )
     parser.add_argument(
         "--direct-prompt",
         type=Path,
-        default=Path("experiments/gemma_category_compare/prompt_json_strict.txt"),
+        help=(
+            "Gemma Direct JSON 프롬프트의 기반이 될 초안 프롬프트입니다. "
+            "생략하면 --gemma-prompt와 같은 파일을 사용합니다."
+        ),
+    )
+    parser.add_argument(
+        "--gemma-prompt",
+        type=Path,
+        default=DEFAULT_GEMMA_PROMPT,
+        help="Gemma 초안 생성 기준 프롬프트입니다. Split Pipeline과 Direct draft 규칙에 함께 사용됩니다.",
     )
     parser.add_argument(
         "--image-root",
@@ -184,11 +194,20 @@ def resolve_project_path(path: Path) -> Path:
     return PROJECT_ROOT / path
 
 
+def configure_gemma_prompt(prompt_path: Path) -> None:
+    candidate = resolve_project_path(prompt_path)
+    if not candidate.exists():
+        raise FileNotFoundError(f"Gemma 프롬프트 파일을 찾을 수 없습니다: {prompt_path}")
+    os.environ["GEMMA_PROMPT_PATH"] = str(prompt_path)
+
+
 def configure_local_gemma_defaults(*, enabled: bool) -> None:
     if not enabled:
         return
 
     for name, value in GEMMA_ENV_DEFAULTS.items():
+        if name == "GEMMA_PROMPT_PATH":
+            continue
         if name in {"GEMMA_MODEL_PATH", "GEMMA_MMPROJ_PATH", "GEMMA_PROMPT_PATH"}:
             candidate = resolve_project_path(Path(value))
             if candidate.exists():
@@ -361,10 +380,33 @@ def run_classifier_baseline(
 
 
 def render_direct_prompt(prompt_path: Path, labels: list[str]) -> str:
-    template = prompt_path.read_text(encoding="utf-8").strip()
+    draft_prompt = prompt_path.read_text(encoding="utf-8").strip()
+    draft_prompt = draft_prompt.replace("{user_prompt}", "").strip()
     labels_block = "\n".join(f"- {label}" for label in labels)
-    labels_inline = ", ".join(labels)
-    return template.replace("{labels_block}", labels_block).replace("{labels}", labels_inline)
+    if "기타" in labels:
+        fallback_instruction = '애매하거나 어떤 카테고리에도 속하지 않으면 "기타"를 선택해라.'
+    else:
+        fallback_instruction = "애매하더라도 반드시 선택 가능한 카테고리 중 가장 가까운 1개를 선택해라."
+    direct_rules = f"""
+위 초안 작성 기준은 최종 JSON의 "draft" 값에 적용해라.
+최종 응답 자체는 아래 JSON 출력 규칙을 최우선으로 따라라.
+
+선택 가능한 카테고리:
+{labels_block}
+
+JSON 출력 규칙:
+- 반드시 JSON 객체 1개만 출력해라.
+- JSON key는 "draft", "category" 두 개만 사용해라.
+- draft는 위 초안 작성 기준을 따른 한국어 2줄 글이어야 한다.
+- JSON 문자열 안의 줄바꿈은 \\n으로 표현해라.
+- category는 선택 가능한 카테고리 중 정확히 1개만 작성해라.
+- {fallback_instruction}
+- 설명, 마크다운 코드블록, 추가 문장은 출력하지 마라.
+
+출력 예시:
+{{"draft":"한강 근처를 뛰고 나니 땀이 나도 이상하게 기분이 가벼웠다.\\n바람도 선선해서 오늘 러닝은 오래 기억에 남을 것 같다.","category":"운동"}}
+""".strip()
+    return f"{draft_prompt}\n\n{direct_rules}"
 
 
 def prompt_hash(prompt_text: str) -> str:
@@ -432,7 +474,7 @@ def parse_direct_output(raw_output: str, labels: list[str]) -> dict[str, Any]:
 
     return {
         "draft": draft,
-        "predicted_label": category or "기타",
+        "predicted_label": category or "__invalid__",
         "parse_status": "text" if category is not None else "failed",
     }
 
@@ -816,6 +858,7 @@ def build_summary_markdown(
         f"- input_jsonl: `{args.input_jsonl}`",
         f"- rows: {len(rows)}",
         f"- direct_labels: {', '.join(direct_labels)}",
+        f"- gemma_prompt: `{args.gemma_prompt}`",
         f"- direct_prompt: `{args.direct_prompt}`",
         f"- direct_prompt_hash: `{prompt_hash(prompt_text)}`",
         f"- output_dir: `{output_dir}`",
@@ -910,6 +953,7 @@ def save_experiment_outputs(
         "rows": len(rows),
         "labels": labels,
         "direct_labels": direct_labels,
+        "gemma_prompt_path": str(args.gemma_prompt),
         "direct_prompt_path": str(args.direct_prompt),
         "direct_prompt_hash": prompt_hash(prompt_text),
         "methods": metrics_by_method,
@@ -947,11 +991,11 @@ def print_run_summary(metrics_payload: dict[str, Any], output_dir: Path) -> None
 
 def main() -> None:
     args = parse_args()
+    if args.direct_prompt is None:
+        args.direct_prompt = args.gemma_prompt
     output_dir = resolve_project_path(args.output_dir) if args.output_dir else default_output_dir()
     rows = load_eval_rows(args)
     direct_labels = ordered_unique(comma_values(args.direct_labels))
-    if "기타" not in direct_labels:
-        direct_labels.append("기타")
 
     prompt_path = resolve_project_path(args.direct_prompt)
     prompt_text = render_direct_prompt(prompt_path, direct_labels)
@@ -977,6 +1021,7 @@ def main() -> None:
 
     llm: Any | None = None
     if args.run_gemma_direct or args.run_split_pipeline:
+        configure_gemma_prompt(args.gemma_prompt)
         configure_local_gemma_defaults(enabled=not args.no_local_gemma_defaults)
         llm = load_gemma_llm(verbose=args.gemma_verbose)
 
