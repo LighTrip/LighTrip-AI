@@ -1,0 +1,164 @@
+{
+  "model": "linear_svm",
+  "created_at": "2026-05-11T12:20:05",
+  "labels": [
+    "공원",
+    "문화",
+    "쇼핑",
+    "술집",
+    "식당",
+    "운동",
+    "카페"
+  ],
+  "dataset": {
+    "train": "data_places365_2/processed/train.jsonl",
+    "valid": "data_places365_2/processed/valid.jsonl",
+    "test": "data_places365_2/processed/test.jsonl",
+    "train_size": 2747,
+    "valid_size": 339,
+    "test_size": 339
+  },
+  "params": {
+    "max_features": 20000,
+    "min_df": 1,
+    "max_df": 0.95,
+    "ngram_max": 2,
+    "alpha": 1.0,
+    "c": 1.0,
+    "max_iter": 2000,
+    "solver": "lbfgs",
+    "class_weight": "balanced"
+  },
+  "valid": {
+    "accuracy": 0.8407079646017699,
+    "precision_weighted": 0.8416377924107903,
+    "recall_weighted": 0.8407079646017699,
+    "f1_weighted": 0.841038036804016,
+    "precision_macro": 0.8453100583896556,
+    "recall_macro": 0.8382288793284337,
+    "f1_macro": 0.8415844279814186,
+    "classification_report": {
+      "공원": {
+        "precision": 0.8876404494382022,
+        "recall": 0.9080459770114943,
+        "f1-score": 0.8977272727272727,
+        "support": 87.0
+      },
+      "문화": {
+        "precision": 0.9090909090909091,
+        "recall": 0.8823529411764706,
+        "f1-score": 0.8955223880597014,
+        "support": 34.0
+      },
+      "쇼핑": {
+        "precision": 0.7868852459016393,
+        "recall": 0.7741935483870968,
+        "f1-score": 0.7804878048780488,
+        "support": 62.0
+      },
+      "술집": {
+        "precision": 0.9473684210526315,
+        "recall": 0.9,
+        "f1-score": 0.9230769230769231,
+        "support": 20.0
+      },
+      "식당": {
+        "precision": 0.7058823529411765,
+        "recall": 0.7272727272727273,
+        "f1-score": 0.7164179104477613,
+        "support": 33.0
+      },
+      "운동": {
+        "precision": 0.9166666666666666,
+        "recall": 0.8979591836734694,
+        "f1-score": 0.9072164948453607,
+        "support": 49.0
+      },
+      "카페": {
+        "precision": 0.7636363636363637,
+        "recall": 0.7777777777777778,
+        "f1-score": 0.7706422018348624,
+        "support": 54.0
+      },
+      "accuracy": 0.8407079646017699,
+      "macro avg": {
+        "precision": 0.8453100583896556,
+        "recall": 0.8382288793284337,
+        "f1-score": 0.8415844279814186,
+        "support": 339.0
+      },
+      "weighted avg": {
+        "precision": 0.8416377924107903,
+        "recall": 0.8407079646017699,
+        "f1-score": 0.841038036804016,
+        "support": 339.0
+      }
+    }
+  },
+  "test": {
+    "accuracy": 0.8731563421828908,
+    "precision_weighted": 0.8732890458971675,
+    "recall_weighted": 0.8731563421828908,
+    "f1_weighted": 0.8725514523376372,
+    "precision_macro": 0.8672116615463389,
+    "recall_macro": 0.8624921130734579,
+    "f1_macro": 0.8641455328599167,
+    "classification_report": {
+      "공원": {
+        "precision": 0.8888888888888888,
+        "recall": 0.9195402298850575,
+        "f1-score": 0.903954802259887,
+        "support": 87.0
+      },
+      "문화": {
+        "precision": 0.8709677419354839,
+        "recall": 0.7941176470588235,
+        "f1-score": 0.8307692307692308,
+        "support": 34.0
+      },
+      "쇼핑": {
+        "precision": 0.890625,
+        "recall": 0.9193548387096774,
+        "f1-score": 0.9047619047619047,
+        "support": 62.0
+      },
+      "술집": {
+        "precision": 0.9,
+        "recall": 0.9,
+        "f1-score": 0.9,
+        "support": 20.0
+      },
+      "식당": {
+        "precision": 0.7428571428571429,
+        "recall": 0.7878787878787878,
+        "f1-score": 0.7647058823529412,
+        "support": 33.0
+      },
+      "운동": {
+        "precision": 0.92,
+        "recall": 0.9387755102040817,
+        "f1-score": 0.9292929292929293,
+        "support": 49.0
+      },
+      "카페": {
+        "precision": 0.8571428571428571,
+        "recall": 0.7777777777777778,
+        "f1-score": 0.8155339805825242,
+        "support": 54.0
+      },
+      "accuracy": 0.8731563421828908,
+      "macro avg": {
+        "precision": 0.8672116615463389,
+        "recall": 0.8624921130734579,
+        "f1-score": 0.8641455328599167,
+        "support": 339.0
+      },
+      "weighted avg": {
+        "precision": 0.8732890458971675,
+        "recall": 0.8731563421828908,
+        "f1-score": 0.8725514523376372,
+        "support": 339.0
+      }
+    }
+  }
+}
