@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import logging
-import time
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
+from typing_extensions import Annotated
 
 from app.services.blog_pipeline_service import generate_draft_and_classify
 from app.services.category_service import is_category_model_loaded
@@ -30,8 +30,8 @@ class PipelineResponse(BaseModel):
     response_model_exclude_none=True,
 )
 async def generate(
-    image: UploadFile = File(...),
-    text: str = Form(""),
+    image: Annotated[UploadFile, File()],
+    text: Annotated[str, Form()] = "",
 ):
     llm = get_llm()
     if llm is None or not is_model_loaded():
@@ -50,22 +50,13 @@ async def generate(
         if not image_bytes:
             raise HTTPException(status_code=400, detail="이미지 파일이 비어 있습니다.")
 
-        start_time = time.perf_counter()
         result = generate_draft_and_classify(
             llm=llm,
             image_bytes=image_bytes,
             filename=image.filename or "upload.jpg",
             user_prompt=text,
         )
-        elapsed = time.perf_counter() - start_time
-        logger.info(
-            "Pipeline inference completed: filename=%s category=%s source=%s fallback_reason=%s elapsed=%.2f",
-            image.filename,
-            result.category,
-            result.category_source,
-            result.fallback_reason,
-            elapsed,
-        )
+        logger.info("Pipeline inference completed")
         return {
             "draft": result.draft,
             "category": result.category,
