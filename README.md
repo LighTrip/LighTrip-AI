@@ -119,63 +119,67 @@ SVM fallback threshold는 API 입력으로 받지 않고 `CATEGORY_UNKNOWN_THRES
 LighTrip-AI/
 ├── app/
 │   ├── api/
-│   │   ├── gemma.py
-│   │   └── pipeline.py
+│   ├── config/
+│   ├── prompts/
 │   ├── services/
-│   │   ├── blog_pipeline_service.py
-│   │   ├── category_policy.py
-│   │   ├── category_service.py
-│   │   └── gemma_service.py
 │   └── main.py
 ├── configs/
 │   ├── dataset_categories.json
 │   ├── places365_categories.json
 │   └── places365_categories_v2.json
+├── data/
+│   ├── images/
+│   ├── interim/
+│   └── processed/
+├── data_places365/
 ├── data_places365_2/
-│   ├── 카페/
-│   ├── 식당/
-│   ├── 술집/
-│   ├── 문화/
-│   ├── 운동/
-│   ├── 쇼핑/
-│   ├── 공원/
+│   ├── <label>/
 │   ├── final_filtered/
 │   ├── interim/
-│   ├── manual_review_full/
+│   ├── manual_review*/
 │   ├── processed/
+│   ├── quality/
+│   ├── semantic_filter/
 │   └── splits/
 ├── docs/
-│   └── category_classifier/
-│       └── cv_5fold/
+│   ├── category_classifier/
+│   │   └── cv_5fold/
+│   └── *.md
 ├── experiments/
 │   ├── category_classifier/
-│   │   ├── src/
-│   │   ├── compare_cv.py
-│   │   ├── infer.py
-│   │   ├── train.py
-│   │   └── stopwords_ko.txt
-│   └── gemma/
-│       └── v1_prompt.py
+│   ├── gemma/
+│   └── gemma_category_compare/
+├── models/
 ├── scripts/
 │   └── dataset/
-│       ├── collect_places365.py
-│       ├── generate_places365_drafts.py
-│       ├── split_places365_dataset.py
-│       └── validate_drafts.py
+├── tests/
+├── requirements-api.txt
 ├── requirements-classifier.txt
 ├── requirements-dataset.txt
+├── run_api.local.sh
 └── README.md
 ```
 
 | Path | Description |
 | --- | --- |
 | `app/` | FastAPI 기반 AI serving 코드 |
+| `app/api/` | Gemma 및 통합 pipeline API endpoint |
+| `app/config/` | Gemma runtime/config 로딩 코드 |
+| `app/prompts/` | Gemma 프롬프트 포맷터 및 프롬프트 헬퍼 |
+| `app/services/` | 초안 생성, 카테고리 정책, fallback 분류 서비스 |
 | `configs/` | 카테고리 매핑, Places365 설정, 초안 생성 프롬프트 |
-| `data_places365_2/` | Places365 v2 기반 이미지 원천, manual review 산출물, train/valid/test JSONL |
-| `docs/category_classifier/cv_5fold/` | 5-fold 모델 비교 보고서, CSV, 그래프 산출물 |
+| `data/` | 기본 이미지/중간 산출물/processed 데이터 |
+| `data_places365/` | Places365 v1 및 service prompt 실험 데이터 |
+| `data_places365_2/` | Places365 v2 이미지, 품질 검사, manual review, split/processed 데이터 |
+| `docs/` | 데이터셋 검토, 모델 비교, Gemma/SVM 실험 결과 문서 |
+| `docs/category_classifier/` | 카테고리 분류기 재학습 및 fallback threshold 문서 |
+| `docs/category_classifier/cv_5fold/` | 5-fold 모델 비교 그래프, CSV, JSON, TXT 산출물 |
 | `experiments/category_classifier/` | TF-IDF 카테고리 분류 학습, 추론, 교차검증 실험 코드 |
 | `experiments/gemma/` | Gemma 초안 생성 실험 코드 |
+| `experiments/gemma_category_compare/` | Gemma Direct와 Gemma + SVM pipeline 비교 실험 코드/결과 |
+| `models/` | 로컬 Gemma GGUF, mmproj, SVM artifact |
 | `scripts/dataset/` | 데이터 수집, 초안 생성, split, 검증 스크립트 |
+| `tests/` | 서비스 정책 및 pipeline 단위 테스트 |
 
 ## Category Classification
 
@@ -184,7 +188,7 @@ LighTrip-AI/
 - Fallback model: **TF-IDF + calibrated Linear SVM**
 - Service labels: 카페, 식당, 술집, 문화, 운동, 쇼핑, 공원, 기타
 - Training/evaluation labels: 카페, 식당, 술집, 문화, 운동, 쇼핑, 공원
-- Model selection report: `docs/category_classifier/cv_5fold/model_selection_5fold.md`
+- Model selection report: `docs/카테고리_분류_모델_5폴드_교차_검증_결과.md`
 - Runtime artifact: `experiments/category_classifier/artifacts/places365_2_manual_full_calibrated/calibrated_linear_svm_tfidf.joblib`
 - Training data: `data_places365_2/processed/train.jsonl` (`2747` rows)
 - Validation data: `data_places365_2/processed/valid.jsonl` (`339` rows)
@@ -305,19 +309,20 @@ data_places365_2/
 
 | Report | Path |
 | --- | --- |
-| 5-fold model selection report | `docs/category_classifier/cv_5fold/model_selection_5fold.md` |
-| CV summary CSV | `docs/category_classifier/cv_5fold/cv_summary.csv` |
-| Fold-level CV results | `docs/category_classifier/cv_5fold/cv_fold_results.csv` |
-| CV result JSON | `docs/category_classifier/cv_5fold/cv_results.json` |
+| 5-fold model selection report | `docs/카테고리_분류_모델_5폴드_교차_검증_결과.md` |
+| CV summary CSV | `docs/category_classifier/cv_5fold/모델별_성능_요약.csv` |
+| Fold-level CV results | `docs/category_classifier/cv_5fold/폴드별_성능_결과.csv` |
+| CV result JSON | `docs/category_classifier/cv_5fold/5폴드_전체_결과.json` |
 
 ## Tech Stack
 
 | Area | Tools |
 | --- | --- |
-| Image/draft generation | PyTorch, HuggingFace Transformers, llama-cpp-python |
-| Category classification | scikit-learn, NumPy, joblib |
+| Image/draft generation | GGUF Gemma, llama-cpp-python |
+| Category classification | scikit-learn, joblib |
+| Dataset collection/processing | Hugging Face Datasets, FiftyOne, Pillow |
 | Evaluation/visualization | scikit-learn, matplotlib |
-| Serving | FastAPI |
+| Serving | FastAPI, Uvicorn |
 
 ## Development Workflow
 
@@ -356,14 +361,12 @@ feature/1-login
 | `start` | 새로운 프로젝트를 시작할 때 |
 | `feat` | 새로운 기능을 추가할 때 |
 | `fix` | 버그를 수정할 때 |
-| `design` | CSS 등 사용자 UI 디자인을 변경할 때 |
 | `refactor` | 기능 변경 없이 코드를 리팩토링할 때 |
 | `settings` | 설정 파일을 변경할 때 |
+| `experiment` | 실험 코드나 실험 설정을 추가/변경할 때 |
 | `comment` | 필요한 주석을 추가하거나 변경할 때 |
-| `dependency/Plugin` | 의존성/플러그인을 추가할 때 |
 | `docs` | README.md 등 문서를 수정할 때 |
 | `merge` | 브랜치를 병합할 때 |
-| `deploy` | 빌드 및 배포 관련 작업을 할 때 |
 | `rename` | 파일 혹은 폴더명을 수정하거나 옮길 때 |
 | `remove` | 파일을 삭제하는 작업만 수행했을 때 |
 | `revert` | 이전 버전으로 롤백할 때 |

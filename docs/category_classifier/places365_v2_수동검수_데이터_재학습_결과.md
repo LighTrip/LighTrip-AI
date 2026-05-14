@@ -99,7 +99,7 @@ CATEGORY_ARTIFACT_PATH=experiments/category_classifier/artifacts/places365_2_man
 CATEGORY_UNKNOWN_LABEL=기타
 ```
 
-confidence threshold 기반 `기타` fallback을 운영하려면 `predict_proba`가 필요하므로 calibrated artifact를 사용합니다. 상세 threshold tuning 결과는 `docs/category_classifier/unknown_fallback_threshold.md`를 참고합니다.
+confidence threshold 기반 `기타` fallback을 운영하려면 `predict_proba`가 필요하므로 calibrated artifact를 사용합니다. 상세 threshold tuning 결과는 `docs/category_classifier/기타_폴백_임계값_튜닝_결과.md`를 참고합니다.
 
 ```bash
 CATEGORY_ARTIFACT_PATH=experiments/category_classifier/artifacts/places365_2_manual_full_calibrated/calibrated_linear_svm_tfidf.joblib
