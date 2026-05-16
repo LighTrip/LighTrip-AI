@@ -1,0 +1,227 @@
+{
+  "dataset": "Andron00e/Places365-custom",
+  "split": "train",
+  "output_dir": "data/title_color_recommendation/raw/places365",
+  "target_total_images": 30000,
+  "mapping_policy": "title_color_background_scene_categories",
+  "notes": [
+    "Places365 is scene-centric. The people/product/fashion/abstract categories are mapped to background-like scene classes rather than object-centric product photos.",
+    "Use this raw collection before minimum quality filtering into data/title_color_recommendation/processed/clean_images."
+  ],
+  "categories": [
+    {
+      "label": "nature",
+      "slug": "nature",
+      "places365": [
+        {"id": 81, "label": "canyon", "slug": "canyon"},
+        {"id": 97, "label": "coast", "slug": "coast"},
+        {"id": 110, "label": "creek", "slug": "creek"},
+        {"id": 141, "label": "field wild", "slug": "field_wild"},
+        {"id": 150, "label": "forest broadleaf", "slug": "forest_broadleaf"},
+        {"id": 151, "label": "forest path", "slug": "forest_path"},
+        {"id": 152, "label": "forest road", "slug": "forest_road"},
+        {"id": 205, "label": "lake natural", "slug": "lake_natural"},
+        {"id": 232, "label": "mountain", "slug": "mountain"},
+        {"id": 233, "label": "mountain path", "slug": "mountain_path"},
+        {"id": 234, "label": "mountain snowy", "slug": "mountain_snowy"},
+        {"id": 243, "label": "ocean", "slug": "ocean"},
+        {"id": 279, "label": "rainforest", "slug": "rainforest"},
+        {"id": 288, "label": "river", "slug": "river"},
+        {"id": 344, "label": "valley", "slug": "valley"},
+        {"id": 350, "label": "volcano", "slug": "volcano"},
+        {"id": 355, "label": "waterfall", "slug": "waterfall"}
+      ]
+    },
+    {
+      "label": "city",
+      "slug": "city",
+      "places365": [
+        {"id": 66, "label": "bridge", "slug": "bridge"},
+        {"id": 67, "label": "building facade", "slug": "building_facade"},
+        {"id": 79, "label": "canal urban", "slug": "canal_urban"},
+        {"id": 112, "label": "crosswalk", "slug": "crosswalk"},
+        {"id": 125, "label": "downtown", "slug": "downtown"},
+        {"id": 175, "label": "highway", "slug": "highway"},
+        {"id": 245, "label": "office building", "slug": "office_building"},
+        {"id": 257, "label": "parking lot", "slug": "parking_lot"},
+        {"id": 270, "label": "plaza", "slug": "plaza"},
+        {"id": 273, "label": "promenade", "slug": "promenade"},
+        {"id": 283, "label": "residential neighborhood", "slug": "residential_neighborhood"},
+        {"id": 307, "label": "skyscraper", "slug": "skyscraper"},
+        {"id": 319, "label": "street", "slug": "street"},
+        {"id": 320, "label": "subway station platform", "slug": "subway_station_platform"},
+        {"id": 337, "label": "train station platform", "slug": "train_station_platform"},
+        {"id": 347, "label": "viaduct", "slug": "viaduct"}
+      ]
+    },
+    {
+      "label": "food",
+      "slug": "food",
+      "places365": [
+        {"id": 31, "label": "bakery shop", "slug": "bakery_shop"},
+        {"id": 75, "label": "cafeteria", "slug": "cafeteria"},
+        {"id": 99, "label": "coffee shop", "slug": "coffee_shop"},
+        {"id": 114, "label": "delicatessen", "slug": "delicatessen"},
+        {"id": 119, "label": "diner outdoor", "slug": "diner_outdoor"},
+        {"id": 120, "label": "dining hall", "slug": "dining_hall"},
+        {"id": 121, "label": "dining room", "slug": "dining_room"},
+        {"id": 139, "label": "fastfood restaurant", "slug": "fastfood_restaurant"},
+        {"id": 148, "label": "food court", "slug": "food_court"},
+        {"id": 185, "label": "ice cream parlor", "slug": "ice_cream_parlor"},
+        {"id": 267, "label": "pizzeria", "slug": "pizzeria"},
+        {"id": 284, "label": "restaurant", "slug": "restaurant"},
+        {"id": 285, "label": "restaurant kitchen", "slug": "restaurant_kitchen"},
+        {"id": 286, "label": "restaurant patio", "slug": "restaurant_patio"},
+        {"id": 322, "label": "sushi bar", "slug": "sushi_bar"}
+      ]
+    },
+    {
+      "label": "people",
+      "slug": "people",
+      "places365": [
+        {"id": 5, "label": "amphitheater", "slug": "amphitheater"},
+        {"id": 27, "label": "auditorium", "slug": "auditorium"},
+        {"id": 77, "label": "campus", "slug": "campus"},
+        {"id": 92, "label": "classroom", "slug": "classroom"},
+        {"id": 101, "label": "conference center", "slug": "conference_center"},
+        {"id": 102, "label": "conference room", "slug": "conference_room"},
+        {"id": 109, "label": "courtyard", "slug": "courtyard"},
+        {"id": 202, "label": "kindergarden classroom", "slug": "kindergarden_classroom"},
+        {"id": 210, "label": "lecture room", "slug": "lecture_room"},
+        {"id": 217, "label": "lobby", "slug": "lobby"},
+        {"id": 280, "label": "reception", "slug": "reception"},
+        {"id": 296, "label": "schoolhouse", "slug": "schoolhouse"},
+        {"id": 352, "label": "waiting room", "slug": "waiting_room"}
+      ]
+    },
+    {
+      "label": "product",
+      "slug": "product",
+      "places365": [
+        {"id": 60, "label": "bookstore", "slug": "bookstore"},
+        {"id": 72, "label": "butchers shop", "slug": "butchers_shop"},
+        {"id": 80, "label": "candy store", "slug": "candy_store"},
+        {"id": 128, "label": "drugstore", "slug": "drugstore"},
+        {"id": 147, "label": "florist shop indoor", "slug": "florist_shop_indoor"},
+        {"id": 160, "label": "general store indoor", "slug": "general_store_indoor"},
+        {"id": 162, "label": "gift shop", "slug": "gift_shop"},
+        {"id": 172, "label": "hardware store", "slug": "hardware_store"},
+        {"id": 261, "label": "pet shop", "slug": "pet_shop"},
+        {"id": 262, "label": "pharmacy", "slug": "pharmacy"},
+        {"id": 321, "label": "supermarket", "slug": "supermarket"},
+        {"id": 335, "label": "toyshop", "slug": "toyshop"}
+      ]
+    },
+    {
+      "label": "fashion",
+      "slug": "fashion",
+      "places365": [
+        {"id": 95, "label": "closet", "slug": "closet"},
+        {"id": 96, "label": "clothing store", "slug": "clothing_store"},
+        {"id": 115, "label": "department store", "slug": "department_store"},
+        {"id": 126, "label": "dressing room", "slug": "dressing_room"},
+        {"id": 137, "label": "fabric store", "slug": "fabric_store"},
+        {"id": 198, "label": "jewelry shop", "slug": "jewelry_shop"},
+        {"id": 300, "label": "shoe shop", "slug": "shoe_shop"},
+        {"id": 301, "label": "shopfront", "slug": "shopfront"},
+        {"id": 302, "label": "shopping mall indoor", "slug": "shopping_mall_indoor"}
+      ]
+    },
+    {
+      "label": "travel",
+      "slug": "travel",
+      "places365": [
+        {"id": 57, "label": "boardwalk", "slug": "boardwalk"},
+        {"id": 76, "label": "campsite", "slug": "campsite"},
+        {"id": 84, "label": "castle", "slug": "castle"},
+        {"id": 171, "label": "harbor", "slug": "harbor"},
+        {"id": 181, "label": "hotel outdoor", "slug": "hotel_outdoor"},
+        {"id": 182, "label": "hotel room", "slug": "hotel_room"},
+        {"id": 193, "label": "inn outdoor", "slug": "inn_outdoor"},
+        {"id": 200, "label": "kasbah", "slug": "kasbah"},
+        {"id": 214, "label": "lighthouse", "slug": "lighthouse"},
+        {"id": 227, "label": "medina", "slug": "medina"},
+        {"id": 231, "label": "motel", "slug": "motel"},
+        {"id": 251, "label": "pagoda", "slug": "pagoda"},
+        {"id": 252, "label": "palace", "slug": "palace"},
+        {"id": 266, "label": "pier", "slug": "pier"},
+        {"id": 330, "label": "temple asia", "slug": "temple_asia"},
+        {"id": 334, "label": "tower", "slug": "tower"},
+        {"id": 348, "label": "village", "slug": "village"},
+        {"id": 363, "label": "youth hostel", "slug": "youth_hostel"}
+      ]
+    },
+    {
+      "label": "interior",
+      "slug": "interior",
+      "places365": [
+        {"id": 52, "label": "bedroom", "slug": "bedroom"},
+        {"id": 89, "label": "childs room", "slug": "childs_room"},
+        {"id": 106, "label": "corridor", "slug": "corridor"},
+        {"id": 124, "label": "dorm room", "slug": "dorm_room"},
+        {"id": 134, "label": "entrance hall", "slug": "entrance_hall"},
+        {"id": 176, "label": "home office", "slug": "home_office"},
+        {"id": 203, "label": "kitchen", "slug": "kitchen"},
+        {"id": 215, "label": "living room", "slug": "living_room"},
+        {"id": 244, "label": "office", "slug": "office"},
+        {"id": 246, "label": "office cubicles", "slug": "office_cubicles"},
+        {"id": 269, "label": "playroom", "slug": "playroom"},
+        {"id": 281, "label": "recreation room", "slug": "recreation_room"},
+        {"id": 303, "label": "shower", "slug": "shower"},
+        {"id": 328, "label": "television room", "slug": "television_room"},
+        {"id": 343, "label": "utility room", "slug": "utility_room"}
+      ]
+    },
+    {
+      "label": "abstract",
+      "slug": "abstract",
+      "places365": [
+        {"id": 93, "label": "clean room", "slug": "clean_room"},
+        {"id": 103, "label": "construction site", "slug": "construction_site"},
+        {"id": 129, "label": "elevator door", "slug": "elevator_door"},
+        {"id": 131, "label": "elevator shaft", "slug": "elevator_shaft"},
+        {"id": 133, "label": "engine room", "slug": "engine_room"},
+        {"id": 186, "label": "ice floe", "slug": "ice_floe"},
+        {"id": 187, "label": "ice shelf", "slug": "ice_shelf"},
+        {"id": 190, "label": "iceberg", "slug": "iceberg"},
+        {"id": 192, "label": "industrial area", "slug": "industrial_area"},
+        {"id": 199, "label": "junkyard", "slug": "junkyard"},
+        {"id": 255, "label": "parking garage indoor", "slug": "parking_garage_indoor"},
+        {"id": 298, "label": "server room", "slug": "server_room"},
+        {"id": 306, "label": "sky", "slug": "sky"},
+        {"id": 309, "label": "snowfield", "slug": "snowfield"},
+        {"id": 317, "label": "staircase", "slug": "staircase"},
+        {"id": 318, "label": "storage room", "slug": "storage_room"},
+        {"id": 342, "label": "underwater ocean deep", "slug": "underwater_ocean_deep"},
+        {"id": 357, "label": "wave", "slug": "wave"}
+      ]
+    },
+    {
+      "label": "sports",
+      "slug": "sports",
+      "places365": [
+        {"id": 24, "label": "athletic field outdoor", "slug": "athletic_field_outdoor"},
+        {"id": 42, "label": "baseball field", "slug": "baseball_field"},
+        {"id": 44, "label": "basketball court indoor", "slug": "basketball_court_indoor"},
+        {"id": 64, "label": "bowling alley", "slug": "bowling_alley"},
+        {"id": 65, "label": "boxing ring", "slug": "boxing_ring"},
+        {"id": 149, "label": "football field", "slug": "football_field"},
+        {"id": 164, "label": "golf course", "slug": "golf_course"},
+        {"id": 168, "label": "gymnasium indoor", "slug": "gymnasium_indoor"},
+        {"id": 188, "label": "ice skating rink indoor", "slug": "ice_skating_rink_indoor"},
+        {"id": 189, "label": "ice skating rink outdoor", "slug": "ice_skating_rink_outdoor"},
+        {"id": 225, "label": "martial arts gym", "slug": "martial_arts_gym"},
+        {"id": 275, "label": "racecourse", "slug": "racecourse"},
+        {"id": 276, "label": "raceway", "slug": "raceway"},
+        {"id": 305, "label": "ski slope", "slug": "ski_slope"},
+        {"id": 310, "label": "soccer field", "slug": "soccer_field"},
+        {"id": 312, "label": "stadium baseball", "slug": "stadium_baseball"},
+        {"id": 313, "label": "stadium football", "slug": "stadium_football"},
+        {"id": 314, "label": "stadium soccer", "slug": "stadium_soccer"},
+        {"id": 325, "label": "swimming pool indoor", "slug": "swimming_pool_indoor"},
+        {"id": 326, "label": "swimming pool outdoor", "slug": "swimming_pool_outdoor"},
+        {"id": 351, "label": "volleyball court outdoor", "slug": "volleyball_court_outdoor"}
+      ]
+    }
+  ]
+}
