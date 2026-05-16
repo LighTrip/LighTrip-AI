@@ -32,6 +32,10 @@ experiments/category_classifier/artifacts/
 experiments/category_classifier/reports/
 
 # 데이터셋 원천/생성물
+/data/raw/*
+!/data/raw/.gitkeep
+/data/processed/*
+!/data/processed/.gitkeep
 !/data/category_classifier/
 !/data/category_classifier/open_images/
 /data/category_classifier/open_images/images/*
