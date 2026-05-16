@@ -27,7 +27,7 @@ title:
   center_y: 0.333
 
 palette:
-  num_colors: 96
+  num_colors: 32
 
 preprocessing:
   image_extensions:
