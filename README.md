@@ -124,34 +124,65 @@ LighTrip-AI/
 │   ├── services/
 │   └── main.py
 ├── configs/
+│   ├── title_color_recommendation/
+│   │   └── default.yaml
 │   ├── dataset_categories.json
 │   ├── places365_categories.json
 │   └── places365_categories_v2.json
 ├── data/
-│   ├── images/
-│   ├── interim/
-│   └── processed/
-├── data_places365/
-├── data_places365_2/
-│   ├── <label>/
-│   ├── final_filtered/
-│   ├── interim/
-│   ├── manual_review*/
-│   ├── processed/
-│   ├── quality/
-│   ├── semantic_filter/
-│   └── splits/
-├── docs/
 │   ├── category_classifier/
-│   │   └── cv_5fold/
-│   └── *.md
+│   │   ├── open_images/
+│   │   │   ├── images/
+│   │   │   ├── interim/
+│   │   │   └── processed/
+│   │   ├── places365_v1/
+│   │   └── places365_v2/
+│   │       ├── <label>/
+│   │       ├── final_filtered/
+│   │       ├── interim/
+│   │       ├── manual_review*/
+│   │       ├── processed/
+│   │       ├── quality/
+│   │       ├── semantic_filter/
+│   │       └── splits/
+│   └── title_color_recommendation/
+│       ├── raw/
+│       ├── processed/
+│       │   ├── clean_images/
+│       │   ├── labels/
+│       │   ├── masks/
+│       │   └── rois/
+│       └── splits/
+├── docs/
+│   └── category_classifier/
+│       ├── cv_5fold/
+│       └── *.md
 ├── experiments/
 │   ├── category_classifier/
 │   ├── gemma/
-│   └── gemma_category_compare/
+│   ├── gemma_category_compare/
+│   └── title_color_recommendation/
 ├── models/
+├── outputs/
+│   └── title_color_recommendation/
+│       ├── checkpoints/
+│       ├── previews/
+│       └── reports/
 ├── scripts/
 │   └── dataset/
+├── src/
+│   ├── category_classifier/
+│   │   ├── data.py
+│   │   ├── evaluate.py
+│   │   ├── models.py
+│   │   └── preprocess.py
+│   └── title_color_recommendation/
+│       ├── data/
+│       ├── evaluation/
+│       ├── inference/
+│       ├── labeling/
+│       ├── models/
+│       └── training/
 ├── tests/
 ├── requirements-api.txt
 ├── requirements-classifier.txt
@@ -162,24 +193,65 @@ LighTrip-AI/
 
 | Path | Description |
 | --- | --- |
-| `app/` | FastAPI 기반 AI serving 코드 |
-| `app/api/` | Gemma 및 통합 pipeline API endpoint |
-| `app/config/` | Gemma runtime/config 로딩 코드 |
+| `app/` | 기존 초안 생성/카테고리 분류와 새 텍스트 색상 추천이 함께 사용하는 FastAPI serving 코드 |
+| `app/api/` | 공통 API endpoint 계층 |
+| `app/config/` | API runtime, Gemma runtime/config 로딩 코드 |
 | `app/prompts/` | Gemma 프롬프트 포맷터 및 프롬프트 헬퍼 |
-| `app/services/` | 초안 생성, 카테고리 정책, fallback 분류 서비스 |
-| `configs/` | 카테고리 매핑, Places365 설정, 초안 생성 프롬프트 |
-| `data/` | 기본 이미지/중간 산출물/processed 데이터 |
-| `data_places365/` | Places365 v1 및 service prompt 실험 데이터 |
-| `data_places365_2/` | Places365 v2 이미지, 품질 검사, manual review, split/processed 데이터 |
-| `docs/` | 데이터셋 검토, 모델 비교, Gemma/SVM 실험 결과 문서 |
-| `docs/category_classifier/` | 카테고리 분류기 재학습 및 fallback threshold 문서 |
+| `app/services/` | API에서 호출하는 서비스 orchestration 계층 |
+| `configs/` | 카테고리 매핑, Places365 설정, 초안 생성 프롬프트, 기능별 공통 설정 |
+| `configs/title_color_recommendation/default.yaml` | 텍스트 색상 추천 전처리, 라벨링, 학습, 평가, 추론 공통 config |
+| `data/` | 기능별 데이터 root |
+| `data/category_classifier/open_images/images/`, `data/category_classifier/open_images/interim/`, `data/category_classifier/open_images/processed/` | 기존 초안 생성/카테고리 분류용 기본 데이터 영역 |
+| `data/title_color_recommendation/raw/` | 텍스트 색상 추천 원천 이미지/메타데이터 입력 위치 |
+| `data/title_color_recommendation/processed/clean_images/` | 전처리된 이미지 산출물 |
+| `data/title_color_recommendation/processed/rois/` | 제목 색상 추천용 관심 영역 이미지 산출물 |
+| `data/title_color_recommendation/processed/masks/` | 제목 영역/배경 분리 마스크 산출물 |
+| `data/title_color_recommendation/processed/labels/` | 색상 추천 라벨 산출물 |
+| `data/title_color_recommendation/splits/` | 학습/검증/테스트 split 파일 |
+| `data/category_classifier/places365_v1/` | Places365 v1 및 service prompt 실험 데이터 |
+| `data/category_classifier/places365_v2/` | Places365 v2 이미지, 품질 검사, manual review, split/processed 데이터 |
+| `docs/` | 기능별 문서 root |
+| `docs/category_classifier/` | 카테고리 분류 데이터셋 검토, 모델 비교, Gemma/SVM 실험 결과 문서 |
 | `docs/category_classifier/cv_5fold/` | 5-fold 모델 비교 그래프, CSV, JSON, TXT 산출물 |
-| `experiments/category_classifier/` | TF-IDF 카테고리 분류 학습, 추론, 교차검증 실험 코드 |
+| `experiments/category_classifier/` | TF-IDF 카테고리 분류 학습, 추론, 교차검증 실행 코드 |
 | `experiments/gemma/` | Gemma 초안 생성 실험 코드 |
 | `experiments/gemma_category_compare/` | Gemma Direct와 Gemma + SVM pipeline 비교 실험 코드/결과 |
+| `experiments/title_color_recommendation/` | 텍스트 색상 추천 실험 코드/결과 |
 | `models/` | 로컬 Gemma GGUF, mmproj, SVM artifact |
+| `outputs/title_color_recommendation/checkpoints/` | 텍스트 색상 추천 학습 checkpoint 산출물 |
+| `outputs/title_color_recommendation/reports/` | 텍스트 색상 추천 평가 리포트 산출물 |
+| `outputs/title_color_recommendation/previews/` | 텍스트 색상 추천 미리보기 이미지 산출물 |
 | `scripts/dataset/` | 데이터 수집, 초안 생성, split, 검증 스크립트 |
+| `src/category_classifier/` | 카테고리 분류 데이터 로딩, 전처리, 모델, 평가 재사용 로직 |
+| `src/title_color_recommendation/data/` | 텍스트 색상 추천 데이터 로딩/전처리 코드 위치 |
+| `src/title_color_recommendation/labeling/` | 색상 라벨 생성 및 검수 보조 코드 위치 |
+| `src/title_color_recommendation/models/` | 색상 추천 모델 정의 코드 위치 |
+| `src/title_color_recommendation/training/` | 학습 실행 코드 위치 |
+| `src/title_color_recommendation/evaluation/` | 평가 코드 위치 |
+| `src/title_color_recommendation/inference/` | 추론 코드 위치 |
 | `tests/` | 서비스 정책 및 pipeline 단위 테스트 |
+
+## Feature Layout
+
+`app/`은 모든 AI 기능이 함께 사용하는 serving 계층입니다. 카테고리 분류의 재사용 로직과 데이터셋은 각각 `src/category_classifier/`, `data/category_classifier/` 아래에 묶습니다. 새 텍스트 색상 추천 기능은 기능명 기준으로 별도 디렉터리에 개발합니다.
+
+| Feature | Main Development Paths |
+| --- | --- |
+| Draft generation | `app/prompts/`, `app/services/`, `experiments/gemma/` |
+| Category classification | `app/services/`, `src/category_classifier/`, `data/category_classifier/`, `experiments/category_classifier/`, `experiments/gemma_category_compare/`, `scripts/dataset/` |
+| Title color recommendation | `src/title_color_recommendation/`, `configs/title_color_recommendation/`, `data/title_color_recommendation/`, `outputs/title_color_recommendation/`, `experiments/title_color_recommendation/` |
+
+## Title Color Recommendation
+
+Title color recommendation은 사용자 이미지 위에 배치될 텍스트 색상을 추천하기 위한 추가 AI 기능입니다. 이번 단계에서는 모델 구현 없이 개발 구조와 공통 설정만 준비합니다.
+
+- 공통 설정: `configs/title_color_recommendation/default.yaml`
+- 입력/중간 산출물: `data/title_color_recommendation/raw/`, `data/title_color_recommendation/processed/`, `data/title_color_recommendation/splits/`
+- 개발 코드 위치: `src/title_color_recommendation/`
+- 실험 코드/결과 위치: `experiments/title_color_recommendation/`
+- 모델 산출물: `outputs/title_color_recommendation/checkpoints/`, `outputs/title_color_recommendation/reports/`, `outputs/title_color_recommendation/previews/`
+
+`configs/title_color_recommendation/default.yaml`은 입력 크기, ROI, 제목 위치, palette 크기, 라벨링 기준, 학습 하이퍼파라미터, 평가/추론 기본값을 공유합니다. 기존 Gemma Direct, SVM fallback, Places365 파이프라인 코드는 유지하되 데이터셋 경로는 `data/category_classifier/` 기준으로 정리합니다.
 
 ## Category Classification
 
@@ -188,11 +260,11 @@ LighTrip-AI/
 - Fallback model: **TF-IDF + calibrated Linear SVM**
 - Service labels: 카페, 식당, 술집, 문화, 운동, 쇼핑, 공원, 기타
 - Training/evaluation labels: 카페, 식당, 술집, 문화, 운동, 쇼핑, 공원
-- Model selection report: `docs/카테고리_분류_모델_5폴드_교차_검증_결과.md`
+- Model selection report: `docs/category_classifier/카테고리_분류_모델_5폴드_교차_검증_결과.md`
 - Runtime artifact: `experiments/category_classifier/artifacts/places365_2_manual_full_calibrated/calibrated_linear_svm_tfidf.joblib`
-- Training data: `data_places365_2/processed/train.jsonl` (`2747` rows)
-- Validation data: `data_places365_2/processed/valid.jsonl` (`339` rows)
-- Test data: `data_places365_2/processed/test.jsonl` (`339` rows)
+- Training data: `data/category_classifier/places365_v2/processed/train.jsonl` (`2747` rows)
+- Validation data: `data/category_classifier/places365_v2/processed/valid.jsonl` (`339` rows)
+- Test data: `data/category_classifier/places365_v2/processed/test.jsonl` (`339` rows)
 
 ### Model Selection Summary
 
@@ -216,7 +288,7 @@ Places365 이미지를 LighTrip 서비스 카테고리에 매핑한 뒤, manual 
 ### Dataset Policy
 
 - Data source: Places365 scene categories mapped to LighTrip service categories
-- Dataset root: `data_places365_2/`
+- Dataset root: `data/category_classifier/places365_v2/`
 - Mapping config: `configs/places365_categories_v2.json`
 - Dataset labels: 카페, 식당, 술집, 문화, 운동, 쇼핑, 공원
 - Service inference labels: 카페, 식당, 술집, 문화, 운동, 쇼핑, 공원, 기타
@@ -228,7 +300,7 @@ Places365 이미지를 LighTrip 서비스 카테고리에 매핑한 뒤, manual 
 ### Dataset Structure
 
 ```text
-data_places365_2/
+data/category_classifier/places365_v2/
 ├── 카페/
 │   ├── coffee_shop/
 ├── 식당/
@@ -309,7 +381,7 @@ data_places365_2/
 
 | Report | Path |
 | --- | --- |
-| 5-fold model selection report | `docs/카테고리_분류_모델_5폴드_교차_검증_결과.md` |
+| 5-fold model selection report | `docs/category_classifier/카테고리_분류_모델_5폴드_교차_검증_결과.md` |
 | CV summary CSV | `docs/category_classifier/cv_5fold/모델별_성능_요약.csv` |
 | Fold-level CV results | `docs/category_classifier/cv_5fold/폴드별_성능_결과.csv` |
 | CV result JSON | `docs/category_classifier/cv_5fold/5폴드_전체_결과.json` |

@@ -13,7 +13,7 @@ from typing import Any, Callable, Iterable
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "configs" / "dataset_categories.json"
-DEFAULT_PLACES365_DIR = PROJECT_ROOT / "data_places365"
+DEFAULT_PLACES365_DIR = PROJECT_ROOT / "data/category_classifier/places365_v1"
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 TRUE_VALUES = {"1", "true", "yes", "on"}
 
@@ -356,16 +356,16 @@ def run_split_cli(
 def run_open_images_split_cli() -> None:
     run_split_cli(
         description="검증된 JSONL을 train/valid/test로 계층 분할합니다.",
-        default_input=Path("data/processed/accepted_drafts.jsonl"),
-        default_output_dir=Path("data/processed"),
+        default_input=Path("data/category_classifier/open_images/processed/accepted_drafts.jsonl"),
+        default_output_dir=Path("data/category_classifier/open_images/processed"),
     )
 
 
 def run_places365_split_cli() -> None:
     run_split_cli(
         description="검증된 JSONL을 train/valid/test로 계층 분할합니다.",
-        default_input=Path("data_places365/interim/places365_generated_drafts.jsonl"),
-        default_output_dir=Path("data_places365/processed"),
+        default_input=Path("data/category_classifier/places365_v1/interim/places365_generated_drafts.jsonl"),
+        default_output_dir=Path("data/category_classifier/places365_v1/processed"),
     )
 
 

@@ -4,7 +4,7 @@ from pathlib import Path
 from datasets import load_dataset
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SAVE_ROOT = PROJECT_ROOT / "data_places365"
+SAVE_ROOT = PROJECT_ROOT / "data/category_classifier/places365_v1"
 DATASET_NAME = "Andron00e/Places365-custom"
 SPLIT = "train"
 

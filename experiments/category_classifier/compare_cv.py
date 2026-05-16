@@ -25,9 +25,9 @@ except ModuleNotFoundError:
 
 bootstrap_project_root()
 
-from experiments.category_classifier.src.data import load_text_label_dataset
-from experiments.category_classifier.src.evaluate import evaluate_predictions
-from experiments.category_classifier.src.models import (
+from src.category_classifier.data import load_text_label_dataset
+from src.category_classifier.evaluate import evaluate_predictions
+from src.category_classifier.models import (
     MODEL_DISPLAY_NAMES,
     add_model_hyperparameter_arguments,
     add_multi_model_argument,
@@ -46,9 +46,9 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         nargs="+",
         default=[
-            Path("data_places365/processed/train.jsonl"),
-            Path("data_places365/processed/valid.jsonl"),
-            Path("data_places365/processed/test.jsonl"),
+            Path("data/category_classifier/places365_v1/processed/train.jsonl"),
+            Path("data/category_classifier/places365_v1/processed/valid.jsonl"),
+            Path("data/category_classifier/places365_v1/processed/test.jsonl"),
         ],
         help="교차 검증에 사용할 JSONL 파일 목록입니다.",
     )

@@ -13,7 +13,7 @@
 
 ## 데이터셋
 
-- Source: `data_places365_2/manual_review_full/accepted_drafts.jsonl`
+- Source: `data/category_classifier/places365_v2/manual_review_full/accepted_drafts.jsonl`
 - Total: `3,425`
 - Split seed: `42`
 - Train: `2,747`

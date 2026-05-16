@@ -17,8 +17,8 @@ from scripts.dataset.common import read_jsonl, write_jsonl
 
 
 DATASET_FIELDS = ("id", "image", "generated_text", "label")
-DEFAULT_INPUT_DIR = Path("data_places365_2/manual_review_strict")
-DEFAULT_OUTPUT_DIR = Path("data_places365_2/manual_review_full")
+DEFAULT_INPUT_DIR = Path("data/category_classifier/places365_v2/manual_review_strict")
+DEFAULT_OUTPUT_DIR = Path("data/category_classifier/places365_v2/manual_review_full")
 
 INVALID_TEXT_PATTERNS = (
     "<start_of_turn>",

@@ -19,8 +19,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from experiments.category_classifier.src.data import read_jsonl
-from experiments.category_classifier.src.evaluate import (
+from src.category_classifier.data import read_jsonl
+from src.category_classifier.evaluate import (
     evaluate_predictions,
     save_classification_report,
     save_confusion_matrix,
@@ -62,7 +62,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--input-jsonl",
         type=Path,
-        default=Path("data_places365/processed/test.jsonl"),
+        default=Path("data/category_classifier/places365_v1/processed/test.jsonl"),
         help="정답 label과 generated_text가 들어 있는 평가 JSONL입니다.",
     )
     parser.add_argument("--text-field", default="generated_text")
@@ -110,7 +110,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--image-root",
         type=Path,
-        default=Path("data_places365"),
+        default=Path("data/category_classifier/places365_v1"),
         help="JSONL에 image 필드가 없을 때 id로 Places365 이미지 경로를 복원할 루트입니다.",
     )
     parser.add_argument(

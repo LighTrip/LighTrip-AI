@@ -21,7 +21,7 @@ from scripts.dataset.common import PROJECT_ROOT, remove_tree_inside_root, strati
 
 
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "configs" / "places365_categories_v2.json"
-DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "data_places365_2"
+DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "data/category_classifier/places365_v2"
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 METADATA_FIELDS = [
     "id",
@@ -574,7 +574,7 @@ def print_progress(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Places365 클래스를 LighTrip 7개 카테고리로 매핑해 data_places365_2 이미지 데이터셋을 구축합니다."
+        description="Places365 클래스를 LighTrip 7개 카테고리로 매핑해 data/category_classifier/places365_v2 이미지 데이터셋을 구축합니다."
     )
     parser.add_argument("--config-path", type=Path, default=DEFAULT_CONFIG_PATH)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)

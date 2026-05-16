@@ -78,7 +78,7 @@ def has_excluded_label(sample: Any, excluded_classes: set[str]) -> bool:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="FiftyOne으로 Open Images V7 일부 이미지를 수집합니다.")
-    parser.add_argument("--output-dir", type=Path, default=Path("data/images"))
+    parser.add_argument("--output-dir", type=Path, default=Path("data/category_classifier/open_images/images"))
     parser.add_argument("--split", default="validation", choices=["train", "validation", "test"])
     parser.add_argument("--max-samples-per-category", type=int, default=180)
     parser.add_argument("--label-types", default="detections,classifications")

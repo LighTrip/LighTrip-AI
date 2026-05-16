@@ -1,7 +1,7 @@
 # 모델 파일
 *.gguf
 *.joblib
-models/
+/models/
 
 # 실험용 이미지
 experiments/**/images/
@@ -13,33 +13,65 @@ experiments/**/images/
 !requirements-classifier.txt
 !requirements-api.txt
 !experiments/category_classifier/stopwords_ko.txt
-outputs/
+/outputs/
+!/outputs/
+/outputs/*
+!/outputs/title_color_recommendation/
+/outputs/title_color_recommendation/*
+!/outputs/title_color_recommendation/checkpoints/
+/outputs/title_color_recommendation/checkpoints/*
+!/outputs/title_color_recommendation/checkpoints/.gitkeep
+!/outputs/title_color_recommendation/reports/
+/outputs/title_color_recommendation/reports/*
+!/outputs/title_color_recommendation/reports/.gitkeep
+!/outputs/title_color_recommendation/previews/
+/outputs/title_color_recommendation/previews/*
+!/outputs/title_color_recommendation/previews/.gitkeep
 experiments/category_classifier/artifacts/
 experiments/category_classifier/reports/
 
 # 데이터셋 원천/생성물
-data/raw/
-data/images/
-data/interim/
-data/processed/
-data/**/*.jpg
-data/**/*.jpeg
-data/**/*.png
-data/**/*.webp
-data/**/*.csv
-data/**/*.jsonl
-data_places365/*/
-data_places365/images/
-data_places365/interim/
-data_places365/processed/
-data_places365/reports/
-data_places365/**/*.jpg
-data_places365/**/*.jpeg
-data_places365/**/*.png
-data_places365/**/*.webp
-data_places365/**/*.csv
-data_places365/**/*.jsonl
-data_places365_2/
+!/data/category_classifier/
+!/data/category_classifier/open_images/
+/data/category_classifier/open_images/images/*
+!/data/category_classifier/open_images/images/.gitkeep
+/data/category_classifier/open_images/interim/*
+!/data/category_classifier/open_images/interim/.gitkeep
+/data/category_classifier/open_images/processed/*
+!/data/category_classifier/open_images/processed/.gitkeep
+!/data/category_classifier/places365_v1/
+/data/category_classifier/places365_v1/*
+!/data/category_classifier/places365_v1/.gitkeep
+/data/category_classifier/places365_v2/**/*.jpg
+/data/category_classifier/places365_v2/**/*.jpeg
+/data/category_classifier/places365_v2/**/*.png
+/data/category_classifier/places365_v2/**/*.webp
+/data/category_classifier/places365_v2/final_filtered/
+/data/category_classifier/places365_v2/interim/
+/data/category_classifier/places365_v2/manual_review*/
+/data/category_classifier/places365_v2/processed/
+/data/category_classifier/places365_v2/processed_service_prompt/
+/data/category_classifier/places365_v2/semantic_filter/
+
+# Title color recommendation scaffold directories
+!data/title_color_recommendation/
+data/title_color_recommendation/raw/*
+!data/title_color_recommendation/raw/.gitkeep
+data/title_color_recommendation/processed/*
+!data/title_color_recommendation/processed/clean_images/
+data/title_color_recommendation/processed/clean_images/*
+!data/title_color_recommendation/processed/clean_images/.gitkeep
+!data/title_color_recommendation/processed/rois/
+data/title_color_recommendation/processed/rois/*
+!data/title_color_recommendation/processed/rois/.gitkeep
+!data/title_color_recommendation/processed/masks/
+data/title_color_recommendation/processed/masks/*
+!data/title_color_recommendation/processed/masks/.gitkeep
+!data/title_color_recommendation/processed/labels/
+data/title_color_recommendation/processed/labels/*
+!data/title_color_recommendation/processed/labels/.gitkeep
+data/title_color_recommendation/splits/*
+!data/title_color_recommendation/splits/.gitkeep
 
 # Python
 __pycache__/

@@ -1,0 +1,63 @@
+# Shared config for title color recommendation experiments.
+
+paths:
+  raw_data_dir: data/title_color_recommendation/raw
+  processed_data_dir: data/title_color_recommendation/processed
+  clean_image_dir: data/title_color_recommendation/processed/clean_images
+  roi_dir: data/title_color_recommendation/processed/rois
+  mask_dir: data/title_color_recommendation/processed/masks
+  label_dir: data/title_color_recommendation/processed/labels
+  split_dir: data/title_color_recommendation/splits
+  checkpoint_dir: outputs/title_color_recommendation/checkpoints
+  report_dir: outputs/title_color_recommendation/reports
+  preview_dir: outputs/title_color_recommendation/previews
+
+input_size:
+  height: 128
+  width: 256
+
+roi:
+  x1: 0.05
+  y1: 0.15
+  x2: 0.95
+  y2: 0.50
+
+title:
+  center_x: 0.5
+  center_y: 0.333
+
+palette:
+  num_colors: 96
+
+preprocessing:
+  image_extensions:
+    - .jpg
+    - .jpeg
+    - .png
+    - .webp
+  save_clean_images: true
+  save_rois: true
+  save_masks: true
+
+labeling:
+  temperature: 0.2
+  contrast_threshold: 4.5
+  min_contrast_p05: 3.0
+
+training:
+  batch_size: 64
+  learning_rate: 0.0003
+  weight_decay: 0.0001
+  epochs: 20
+  seed: 42
+
+evaluation:
+  batch_size: 64
+  metrics:
+    - top1_accuracy
+    - mean_contrast
+    - min_contrast_p05
+
+inference:
+  top_k: 5
+  min_contrast: 4.5

@@ -1,7 +1,7 @@
 # Gemma Direct Category vs Split Classifier Experiment
 
 - created_at: 2026-05-10T02:19:52
-- input_jsonl: `data_places365/processed_service_prompt/test.jsonl`
+- input_jsonl: `data/category_classifier/places365_v1/processed_service_prompt/test.jsonl`
 - rows: 255
 - direct_labels: 카페, 식당, 술집, 문화, 운동, 쇼핑, 공원, 기타
 - direct_prompt: `experiments/gemma_category_compare/prompt_json_strict.txt`

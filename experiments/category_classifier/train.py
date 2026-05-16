@@ -16,14 +16,14 @@ except ModuleNotFoundError:
 
 bootstrap_project_root()
 
-from experiments.category_classifier.src.data import load_text_label_dataset
-from experiments.category_classifier.src.evaluate import (
+from src.category_classifier.data import load_text_label_dataset
+from src.category_classifier.evaluate import (
     evaluate_predictions,
     save_classification_report,
     save_confusion_matrix,
     save_metrics,
 )
-from experiments.category_classifier.src.models import (
+from src.category_classifier.models import (
     add_model_hyperparameter_arguments,
     add_single_model_argument,
     build_pipeline_from_args,
@@ -39,17 +39,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--train",
         type=Path,
-        default=Path("data_places365/processed/train.jsonl"),
+        default=Path("data/category_classifier/places365_v1/processed/train.jsonl"),
     )
     parser.add_argument(
         "--valid",
         type=Path,
-        default=Path("data_places365/processed/valid.jsonl"),
+        default=Path("data/category_classifier/places365_v1/processed/valid.jsonl"),
     )
     parser.add_argument(
         "--test",
         type=Path,
-        default=Path("data_places365/processed/test.jsonl"),
+        default=Path("data/category_classifier/places365_v1/processed/test.jsonl"),
     )
     parser.add_argument("--text-field", default="generated_text")
     parser.add_argument("--label-field", default="label")
