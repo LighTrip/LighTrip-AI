@@ -20,9 +20,9 @@ bootstrap_project_root()
 from scripts.dataset.common import write_jsonl
 
 
-DEFAULT_METADATA = Path("data_places365_2/metadata.csv")
+DEFAULT_METADATA = Path("data/category_classifier/places365_v2/metadata.csv")
 DEFAULT_MAPPING = Path("configs/places365_category_mapping_v2.json")
-DEFAULT_OUTPUT_DIR = Path("data_places365_2/quality")
+DEFAULT_OUTPUT_DIR = Path("data/category_classifier/places365_v2/quality")
 TRAINABLE_DECISIONS = {"keep", "keep_sample_review"}
 
 
@@ -241,7 +241,7 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="data_places365_2 이미지 파일을 초안 생성 전 품질 기준으로 검사합니다."
+        description="data/category_classifier/places365_v2 이미지 파일을 초안 생성 전 품질 기준으로 검사합니다."
     )
     parser.add_argument("--metadata", type=Path, default=DEFAULT_METADATA)
     parser.add_argument("--mapping", type=Path, default=DEFAULT_MAPPING)

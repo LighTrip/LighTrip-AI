@@ -1,7 +1,7 @@
 {
   "dataset": "Andron00e/Places365-custom",
   "split": "train",
-  "output_dir": "data_places365_2",
+  "output_dir": "data/category_classifier/places365_v2",
   "mapping_policy": "direct_only_high_confidence",
   "categories": [
     {

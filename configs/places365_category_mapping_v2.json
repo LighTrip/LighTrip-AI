@@ -3,7 +3,7 @@
   "review_date": "2026-05-10",
   "source_dataset": "Andron00e/Places365-custom",
   "source_split": "train",
-  "reviewed_dataset_dir": "data_places365_2",
+  "reviewed_dataset_dir": "data/category_classifier/places365_v2",
   "source_config": "configs/places365_categories_v2.json",
   "mapping_policy": "service_aligned_direct_only_v2",
   "decision_values": [
@@ -792,7 +792,7 @@
   ],
   "notes": [
     "카테고리별 수량은 균형적이지만 label-level imbalance가 존재한다.",
-    "기타 카테고리는 data_places365_2에 포함되어 있지 않으므로 별도 unknown/negative 데이터가 필요하다.",
+    "기타 카테고리는 data/category_classifier/places365_v2에 포함되어 있지 않으므로 별도 unknown/negative 데이터가 필요하다.",
     "bookstore는 v2 원본 제외 목록에 없었으나 샘플 검토 결과 exclude로 명시했다."
   ]
 }

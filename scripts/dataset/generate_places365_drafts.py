@@ -182,7 +182,7 @@ def parse_args() -> argparse.Namespace:
     add_generation_arguments(
         parser,
         default_input_dir=DEFAULT_PLACES365_DIR,
-        default_output=Path("data_places365/interim/places365_generated_drafts.jsonl"),
+        default_output=Path("data/category_classifier/places365_v1/interim/places365_generated_drafts.jsonl"),
         default_gpu_layers=20,
     )
     parser.add_argument(

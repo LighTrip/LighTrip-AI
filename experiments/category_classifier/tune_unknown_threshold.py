@@ -18,7 +18,7 @@ except ModuleNotFoundError:
 
 bootstrap_project_root()
 
-from experiments.category_classifier.src.data import read_jsonl
+from src.category_classifier.data import read_jsonl
 
 
 def parse_args() -> argparse.Namespace:
@@ -36,17 +36,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--valid",
         type=Path,
-        default=Path("data_places365_2/processed/valid.jsonl"),
+        default=Path("data/category_classifier/places365_v2/processed/valid.jsonl"),
     )
     parser.add_argument(
         "--test",
         type=Path,
-        default=Path("data_places365_2/processed/test.jsonl"),
+        default=Path("data/category_classifier/places365_v2/processed/test.jsonl"),
     )
     parser.add_argument(
         "--excluded",
         type=Path,
-        default=Path("data_places365_2/manual_review_full/excluded_drafts.jsonl"),
+        default=Path("data/category_classifier/places365_v2/manual_review_full/excluded_drafts.jsonl"),
         help="모호/부적합 샘플 fallback rate 확인용 JSONL입니다.",
     )
     parser.add_argument("--text-field", default="generated_text")

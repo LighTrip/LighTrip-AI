@@ -11,9 +11,9 @@
     "카페"
   ],
   "dataset": {
-    "train": "data_places365/processed_service_prompt_smoke/train.jsonl",
-    "valid": "data_places365/processed_service_prompt_smoke/valid.jsonl",
-    "test": "data_places365/processed_service_prompt_smoke/test.jsonl",
+    "train": "data/category_classifier/places365_v1/processed_service_prompt_smoke/train.jsonl",
+    "valid": "data/category_classifier/places365_v1/processed_service_prompt_smoke/valid.jsonl",
+    "test": "data/category_classifier/places365_v1/processed_service_prompt_smoke/test.jsonl",
     "train_size": 7,
     "valid_size": 7,
     "test_size": 7

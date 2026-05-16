@@ -6,7 +6,7 @@
 
 | method | 의미 |
 | --- | --- |
-| `classifier_existing_draft` | `data_places365/processed/test.jsonl`의 저장된 Gemma 초안을 Linear SVM으로 분류한다. SVM 분류기 자체의 빠른 기준선이다. |
+| `classifier_existing_draft` | `data/category_classifier/places365_v1/processed/test.jsonl`의 저장된 Gemma 초안을 Linear SVM으로 분류한다. SVM 분류기 자체의 빠른 기준선이다. |
 | `gemma_direct` | 기존 서비스 초안 생성 프롬프트의 작성 규칙을 반영한 프롬프트로, 이미지에서 Gemma가 `draft`와 `category`를 JSON으로 직접 생성한다. `--run-gemma-direct`를 켰을 때 실행된다. |
 | `split_pipeline` | 이미지에서 Gemma 초안을 새로 생성하고, 그 초안을 Linear SVM으로 분류한다. 운영 파이프라인 end-to-end에 가장 가깝고 `--run-split-pipeline`을 켰을 때 실행된다. |
 
@@ -89,8 +89,8 @@ python3 experiments/gemma_category_compare/run_service_prompt_retrain.py \
 python3 experiments/gemma_category_compare/run_service_prompt_retrain.py \
   --limit-total 70 \
   --overwrite-drafts \
-  --draft-output data_places365/interim/places365_service_prompt_drafts_sample.jsonl \
-  --processed-dir data_places365/processed_service_prompt_sample \
+  --draft-output data/category_classifier/places365_v1/interim/places365_service_prompt_drafts_sample.jsonl \
+  --processed-dir data/category_classifier/places365_v1/processed_service_prompt_sample \
   --artifact-dir experiments/gemma_category_compare/artifacts/service_prompt_classifier_sample \
   --report-dir experiments/gemma_category_compare/reports/service_prompt_classifier_sample
 ```

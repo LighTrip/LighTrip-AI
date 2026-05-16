@@ -14,15 +14,15 @@
   "dataset": {
     "sources": [
       {
-        "path": "data_places365/processed/train.jsonl",
+        "path": "data/category_classifier/places365_v1/processed/train.jsonl",
         "size": 2039
       },
       {
-        "path": "data_places365/processed/valid.jsonl",
+        "path": "data/category_classifier/places365_v1/processed/valid.jsonl",
         "size": 255
       },
       {
-        "path": "data_places365/processed/test.jsonl",
+        "path": "data/category_classifier/places365_v1/processed/test.jsonl",
         "size": 255
       }
     ],

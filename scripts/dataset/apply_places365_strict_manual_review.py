@@ -15,8 +15,8 @@ from scripts.dataset.common import read_jsonl, write_jsonl
 
 
 DATASET_FIELDS = ("id", "image", "generated_text", "label")
-DEFAULT_INPUT_DIR = Path("data_places365_2/manual_review_high_risk")
-DEFAULT_OUTPUT_DIR = Path("data_places365_2/manual_review_strict")
+DEFAULT_INPUT_DIR = Path("data/category_classifier/places365_v2/manual_review_high_risk")
+DEFAULT_OUTPUT_DIR = Path("data/category_classifier/places365_v2/manual_review_strict")
 
 
 SECOND_PASS_EXCLUDES: dict[str, tuple[str, str]] = {

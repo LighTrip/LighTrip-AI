@@ -39,12 +39,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--draft-output",
         type=Path,
-        default=Path("data_places365/interim/places365_service_prompt_drafts.jsonl"),
+        default=Path("data/category_classifier/places365_v1/interim/places365_service_prompt_drafts.jsonl"),
     )
     parser.add_argument(
         "--processed-dir",
         type=Path,
-        default=Path("data_places365/processed_service_prompt"),
+        default=Path("data/category_classifier/places365_v1/processed_service_prompt"),
     )
     parser.add_argument(
         "--artifact-dir",

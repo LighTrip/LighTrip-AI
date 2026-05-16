@@ -1,6 +1,6 @@
 {
   "created_at": "2026-05-10T00:07:03",
-  "input_jsonl": "data_places365/processed/test.jsonl",
+  "input_jsonl": "data/category_classifier/places365_v1/processed/test.jsonl",
   "rows": 5,
   "labels": [
     "카페",

@@ -17,8 +17,8 @@ from scripts.dataset.common import read_jsonl, write_jsonl
 
 
 DATASET_FIELDS = ("id", "image", "generated_text", "label")
-DEFAULT_INPUT = Path("data_places365_2/interim/places365_service_prompt_drafts.jsonl")
-DEFAULT_OUTPUT_DIR = Path("data_places365_2/semantic_filter")
+DEFAULT_INPUT = Path("data/category_classifier/places365_v2/interim/places365_service_prompt_drafts.jsonl")
+DEFAULT_OUTPUT_DIR = Path("data/category_classifier/places365_v2/semantic_filter")
 
 
 STRONG_CUES: dict[str, tuple[str, ...]] = {

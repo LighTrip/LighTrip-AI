@@ -17,8 +17,8 @@ from scripts.dataset.common import read_jsonl, write_jsonl
 
 
 DATASET_FIELDS = ("id", "image", "generated_text", "label")
-DEFAULT_SEMANTIC_DIR = Path("data_places365_2/semantic_filter")
-DEFAULT_OUTPUT_DIR = Path("data_places365_2/final_filtered")
+DEFAULT_SEMANTIC_DIR = Path("data/category_classifier/places365_v2/semantic_filter")
+DEFAULT_OUTPUT_DIR = Path("data/category_classifier/places365_v2/final_filtered")
 
 
 ALIGNMENT_CUES: dict[str, tuple[str, ...]] = {

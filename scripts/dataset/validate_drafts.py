@@ -65,9 +65,9 @@ def strip_to_dataset_fields(row: dict[str, Any]) -> dict[str, Any]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="생성된 초안 JSONL을 품질 검증합니다.")
-    parser.add_argument("--input", type=Path, default=Path("data/interim/generated_drafts.jsonl"))
-    parser.add_argument("--accepted-output", type=Path, default=Path("data/processed/accepted_drafts.jsonl"))
-    parser.add_argument("--rejected-output", type=Path, default=Path("data/interim/rejected_drafts.jsonl"))
+    parser.add_argument("--input", type=Path, default=Path("data/category_classifier/open_images/interim/generated_drafts.jsonl"))
+    parser.add_argument("--accepted-output", type=Path, default=Path("data/category_classifier/open_images/processed/accepted_drafts.jsonl"))
+    parser.add_argument("--rejected-output", type=Path, default=Path("data/category_classifier/open_images/interim/rejected_drafts.jsonl"))
     parser.add_argument("--include-validation-metadata", action="store_true")
     args = parser.parse_args()
 

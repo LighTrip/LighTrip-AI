@@ -111,8 +111,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="이미지 폴더를 순회하며 Gemma4 초안을 JSONL로 생성합니다.")
     add_generation_arguments(
         parser,
-        default_input_dir=Path("data/images"),
-        default_output=Path("data/interim/generated_drafts.jsonl"),
+        default_input_dir=Path("data/category_classifier/open_images/images"),
+        default_output=Path("data/category_classifier/open_images/interim/generated_drafts.jsonl"),
         default_gpu_layers=24,
     )
     return parser.parse_args()
