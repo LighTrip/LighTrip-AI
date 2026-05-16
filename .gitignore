@@ -24,6 +24,7 @@ experiments/**/images/
 !/outputs/title_color_recommendation/reports/
 /outputs/title_color_recommendation/reports/*
 !/outputs/title_color_recommendation/reports/.gitkeep
+!/outputs/title_color_recommendation/reports/palette_preview.png
 !/outputs/title_color_recommendation/previews/
 /outputs/title_color_recommendation/previews/*
 !/outputs/title_color_recommendation/previews/.gitkeep
@@ -58,6 +59,7 @@ experiments/category_classifier/reports/
 data/title_color_recommendation/raw/*
 !data/title_color_recommendation/raw/.gitkeep
 data/title_color_recommendation/processed/*
+!data/title_color_recommendation/processed/palette.json
 !data/title_color_recommendation/processed/clean_images/
 data/title_color_recommendation/processed/clean_images/*
 !data/title_color_recommendation/processed/clean_images/.gitkeep
