@@ -1,26 +1,63 @@
 from __future__ import annotations
 
 import argparse
-import csv
-import hashlib
 import json
-import shutil
+import warnings
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from PIL import Image, ImageOps, ImageStat
 
+try:
+    from scripts.title_color_recommendation.common import (
+        IMAGE_SUFFIXES,
+        PROJECT_ROOT,
+        TITLE_DATA_ROOT,
+        TMP_ROOT,
+        clear_output_dir,
+        dhash,
+        ensure_output_dir,
+        project_relative,
+        read_csv_rows,
+        resolve_input_image_path,
+        resolve_output_path,
+        resolve_project_path,
+        safe_child_path,
+        safe_path_segment,
+        sha256_file,
+        utc_now,
+        write_csv_rows,
+        write_json_file,
+    )
+except ModuleNotFoundError:
+    from common import (  # type: ignore[no-redef]
+        IMAGE_SUFFIXES,
+        PROJECT_ROOT,
+        TITLE_DATA_ROOT,
+        TMP_ROOT,
+        clear_output_dir,
+        dhash,
+        ensure_output_dir,
+        project_relative,
+        read_csv_rows,
+        resolve_input_image_path,
+        resolve_output_path,
+        resolve_project_path,
+        safe_child_path,
+        safe_path_segment,
+        sha256_file,
+        utc_now,
+        write_csv_rows,
+        write_json_file,
+    )
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+Image.MAX_IMAGE_PIXELS = 40_000_000
+warnings.simplefilter("error", Image.DecompressionBombWarning)
+
 DEFAULT_RAW_DIR = PROJECT_ROOT / "data/title_color_recommendation/raw/places365"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "data/title_color_recommendation/processed"
-ALLOWED_CLEAR_ROOTS = (
-    (PROJECT_ROOT / "data/title_color_recommendation/processed").resolve(),
-    Path("/tmp").resolve(),
-)
-IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 QUALITY_FIELDS = [
     "clean_path",
     "quality_status",
@@ -37,24 +74,6 @@ QUALITY_FIELDS = [
 ]
 
 
-def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
-def project_relative(path: Path) -> str:
-    try:
-        return path.resolve().relative_to(PROJECT_ROOT.resolve()).as_posix()
-    except ValueError:
-        return path.as_posix()
-
-
-def project_path(value: str) -> Path:
-    path = Path(value)
-    if path.is_absolute():
-        return path
-    return PROJECT_ROOT / path
-
-
 def default_input_metadata(raw_dir: Path) -> Path:
     metadata = raw_dir / "metadata.csv"
     if metadata.exists():
@@ -63,12 +82,6 @@ def default_input_metadata(raw_dir: Path) -> Path:
     if checkpoint.exists():
         return checkpoint
     return metadata
-
-
-def read_csv_rows(path: Path) -> tuple[list[dict[str, str]], list[str]]:
-    with path.open("r", encoding="utf-8", newline="") as file:
-        reader = csv.DictReader(file)
-        return [dict(row) for row in reader], list(reader.fieldnames or [])
 
 
 def scan_image_rows(raw_dir: Path) -> tuple[list[dict[str, str]], list[str]]:
@@ -91,37 +104,6 @@ def scan_image_rows(raw_dir: Path) -> tuple[list[dict[str, str]], list[str]]:
             }
         )
     return rows, ["id", "image_path", "label", "category_slug", "places365_slug"]
-
-
-def write_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[str]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="") as file:
-        writer = csv.DictWriter(file, fieldnames=fieldnames, extrasaction="ignore")
-        writer.writeheader()
-        for row in rows:
-            writer.writerow({field: row.get(field, "") for field in fieldnames})
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as file:
-        for chunk in iter(lambda: file.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def dhash(image: Image.Image, hash_size: int = 8) -> str:
-    gray = ImageOps.grayscale(image)
-    resized = gray.resize((hash_size + 1, hash_size), Image.Resampling.LANCZOS)
-    pixels = list(resized.getdata())
-    bits: list[str] = []
-
-    for row in range(hash_size):
-        offset = row * (hash_size + 1)
-        for col in range(hash_size):
-            bits.append("1" if pixels[offset + col] > pixels[offset + col + 1] else "0")
-
-    return f"{int(''.join(bits), 2):016x}"
 
 
 def hamming_distance(left: str, right: str) -> int:
@@ -158,28 +140,20 @@ def category_for(row: dict[str, str]) -> str:
 
 
 def clean_path_for(row: dict[str, str], clean_image_dir: Path) -> Path:
-    category = category_for(row)
+    category = safe_path_segment(category_for(row))
     image_id = row.get("id") or Path(row.get("image_path", "image")).stem
-    safe_id = image_id.replace("/", "_").replace("\\", "_")
-    return clean_image_dir / category / f"{safe_id}.jpg"
+    return safe_child_path(
+        clean_image_dir,
+        category,
+        f"{safe_path_segment(image_id, fallback='image')}.jpg",
+    )
 
 
-def raw_path_for(row: dict[str, str]) -> Path:
+def raw_path_for(row: dict[str, str], raw_dir: Path) -> Path | None:
     image_path = row.get("image_path") or row.get("raw_path") or ""
-    return project_path(image_path) if image_path else Path("")
-
-
-def ensure_clearable(path: Path) -> None:
-    resolved = path.resolve()
-    if not any(root in (resolved, *resolved.parents) for root in ALLOWED_CLEAR_ROOTS):
-        raise ValueError(f"정리 허용 경로가 아닙니다: {path}")
-
-
-def clear_output(path: Path) -> None:
-    ensure_clearable(path)
-    if path.exists():
-        shutil.rmtree(path)
-    path.mkdir(parents=True, exist_ok=True)
+    if not image_path:
+        return None
+    return resolve_input_image_path(image_path, raw_dir=raw_dir)
 
 
 def inspect_row(
@@ -194,16 +168,26 @@ def inspect_row(
     output["filtered_at"] = utc_now()
     reasons: list[str] = []
 
-    raw_path = raw_path_for(row)
-    if not str(raw_path):
+    raw_path: Path | None = None
+    try:
+        raw_path = raw_path_for(row, args.raw_dir)
+    except ValueError as exc:
+        reasons.append("unsafe_image_path")
+        output["rejection_error"] = str(exc)
+
+    if raw_path is None and not reasons:
         reasons.append("missing_image_path")
     elif not raw_path.exists():
         reasons.append("file_missing")
+    elif not raw_path.is_file():
+        reasons.append("not_a_file")
+    elif raw_path.suffix.lower() not in IMAGE_SUFFIXES:
+        reasons.append("unsupported_image_suffix")
 
     converted: Image.Image | None = None
     digest = ""
 
-    if not reasons:
+    if not reasons and raw_path is not None:
         try:
             digest = sha256_file(raw_path)
             output["sha256"] = digest
@@ -365,23 +349,71 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> None:
-    args = parse_args()
-    if args.clean_image_dir is None:
-        args.clean_image_dir = args.output_dir / "clean_images"
-    if args.clean_metadata is None:
-        args.clean_metadata = args.output_dir / "clean_metadata.csv"
-    if args.rejected_metadata is None:
-        args.rejected_metadata = args.output_dir / "rejected_metadata.csv"
-    if args.summary is None:
-        args.summary = args.output_dir / "quality_summary.json"
+def configure_paths(args: argparse.Namespace) -> None:
+    read_roots = (TITLE_DATA_ROOT, TMP_ROOT)
+    args.raw_dir = resolve_project_path(
+        args.raw_dir,
+        allowed_roots=read_roots,
+        description="raw directory",
+    )
+    args.output_dir = resolve_output_path(
+        args.output_dir,
+        description="output directory",
+    )
+    args.clean_image_dir = resolve_output_path(
+        args.clean_image_dir or args.output_dir / "clean_images",
+        description="clean image directory",
+    )
+    args.clean_metadata = resolve_output_path(
+        args.clean_metadata or args.output_dir / "clean_metadata.csv",
+        description="clean metadata",
+    )
+    args.rejected_metadata = resolve_output_path(
+        args.rejected_metadata or args.output_dir / "rejected_metadata.csv",
+        description="rejected metadata",
+    )
+    args.summary = resolve_output_path(
+        args.summary or args.output_dir / "quality_summary.json",
+        description="summary",
+    )
     if args.input_metadata is None:
         args.input_metadata = default_input_metadata(args.raw_dir)
+    else:
+        args.input_metadata = resolve_project_path(
+            args.input_metadata,
+            allowed_roots=read_roots,
+            description="input metadata",
+        )
+
+
+def validate_args(args: argparse.Namespace) -> None:
+    if args.min_width <= 0 or args.min_height <= 0:
+        raise ValueError("--min-width와 --min-height는 1 이상이어야 합니다.")
+    if not 0 <= args.dark_threshold <= 255:
+        raise ValueError("--dark-threshold는 0..255 범위여야 합니다.")
+    if not 0 <= args.bright_threshold <= 255:
+        raise ValueError("--bright-threshold는 0..255 범위여야 합니다.")
+    if args.dark_threshold >= args.bright_threshold:
+        raise ValueError("--dark-threshold는 --bright-threshold보다 작아야 합니다.")
+    if args.perceptual_hash_threshold < 0:
+        raise ValueError("--perceptual-hash-threshold는 0 이상이어야 합니다.")
+    if not 1 <= args.jpeg_quality <= 100:
+        raise ValueError("--jpeg-quality는 1..100 범위여야 합니다.")
+    if args.limit < 0:
+        raise ValueError("--limit는 0 이상이어야 합니다.")
+    if args.progress_every < 0:
+        raise ValueError("--progress-every는 0 이상이어야 합니다.")
+
+
+def main() -> None:
+    args = parse_args()
+    configure_paths(args)
+    validate_args(args)
 
     if args.clear_output:
-        clear_output(args.clean_image_dir)
+        clear_output_dir(args.clean_image_dir)
     else:
-        args.clean_image_dir.mkdir(parents=True, exist_ok=True)
+        ensure_output_dir(args.clean_image_dir)
 
     input_metadata: Path | None = args.input_metadata
     if input_metadata.exists():
@@ -426,8 +458,8 @@ def main() -> None:
                 f"accepted={len(accepted)} rejected={len(rejected)}"
             )
 
-    write_csv(args.clean_metadata, accepted, output_fields)
-    write_csv(args.rejected_metadata, rejected, output_fields)
+    write_csv_rows(args.clean_metadata, accepted, output_fields)
+    write_csv_rows(args.rejected_metadata, rejected, output_fields)
 
     summary = summarize(
         accepted=accepted,
@@ -435,11 +467,7 @@ def main() -> None:
         args=args,
         input_metadata=input_metadata,
     )
-    args.summary.parent.mkdir(parents=True, exist_ok=True)
-    args.summary.write_text(
-        json.dumps(summary, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    write_json_file(args.summary, summary)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 

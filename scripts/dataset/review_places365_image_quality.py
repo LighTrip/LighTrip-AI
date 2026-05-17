@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import hashlib
 import json
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -17,7 +16,7 @@ except ModuleNotFoundError:
 
 bootstrap_project_root()
 
-from scripts.dataset.common import write_jsonl
+from scripts.dataset.common import dhash, sha256_file, write_jsonl
 
 
 DEFAULT_METADATA = Path("data/category_classifier/places365_v2/metadata.csv")
@@ -63,26 +62,6 @@ def load_mapping(path: Path) -> dict[str, dict[str, Any]]:
             "places365_label": str(places.get("label", "")),
         }
     return by_slug
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as file:
-        for chunk in iter(lambda: file.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def dhash(image: Image.Image, hash_size: int = 8) -> str:
-    gray = ImageOps.grayscale(image)
-    resized = gray.resize((hash_size + 1, hash_size), Image.Resampling.LANCZOS)
-    pixels = list(resized.getdata())
-    bits: list[str] = []
-    for row in range(hash_size):
-        offset = row * (hash_size + 1)
-        for col in range(hash_size):
-            bits.append("1" if pixels[offset + col] > pixels[offset + col + 1] else "0")
-    return f"{int(''.join(bits), 2):016x}"
 
 
 def image_stats(image: Image.Image) -> tuple[float, float]:

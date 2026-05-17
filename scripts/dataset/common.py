@@ -97,6 +97,28 @@ def write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
             file.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def dhash(image: Any, hash_size: int = 8) -> str:
+    from PIL import Image, ImageOps
+
+    gray = ImageOps.grayscale(image)
+    resized = gray.resize((hash_size + 1, hash_size), Image.Resampling.LANCZOS)
+    pixels = list(resized.getdata())
+    bits: list[str] = []
+    for row in range(hash_size):
+        offset = row * (hash_size + 1)
+        for col in range(hash_size):
+            bits.append("1" if pixels[offset + col] > pixels[offset + col + 1] else "0")
+    return f"{int(''.join(bits), 2):016x}"
+
+
 def append_jsonl(path: Path, row: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
