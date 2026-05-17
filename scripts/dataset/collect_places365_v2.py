@@ -49,6 +49,16 @@ class ClassMapping:
     places365_slug: str
 
 
+@dataclass(frozen=True)
+class CollectionRunState:
+    checkpoint_metadata_path: Path
+    existing_rows: list[dict[str, Any]]
+    seen_source_paths: set[str]
+    category_counts: dict[str, int]
+    class_counts: dict[str, int]
+    next_indices: dict[str, int]
+
+
 def normalize_places_slug(value: str) -> str:
     return value.strip().lower().replace(" ", "_").replace("-", "_")
 
@@ -274,6 +284,91 @@ def build_existing_file_rows(
             )
 
     return rebuilt_rows
+
+
+def load_existing_collection_state(
+    *,
+    output_dir: Path,
+    mappings_by_slug: dict[str, ClassMapping],
+    source_dataset: str,
+    source_split: str,
+) -> tuple[
+    list[dict[str, Any]],
+    set[str],
+    dict[str, int],
+    dict[str, int],
+    dict[str, int],
+]:
+    raw_existing_rows = [
+        *read_metadata_csv(output_dir / "metadata.csv"),
+        *read_metadata_csv(output_dir / CHECKPOINT_METADATA_NAME),
+    ]
+    existing_rows: list[dict[str, Any]] = [
+        row
+        for row in dedupe_metadata_rows(raw_existing_rows)
+        if str(row.get("places365_slug", "")) in mappings_by_slug
+        and str(row.get("label", ""))
+        == mappings_by_slug[str(row.get("places365_slug", ""))].category_label
+    ]
+    existing_rows.extend(
+        build_existing_file_rows(
+            output_dir=output_dir,
+            mappings_by_slug=mappings_by_slug,
+            source_dataset=source_dataset,
+            source_split=source_split,
+            existing_rows=existing_rows,
+        )
+    )
+
+    seen_source_paths = {
+        str(row.get("source_image_file_path", ""))
+        for row in existing_rows
+        if row.get("source_image_file_path")
+    }
+    category_counts, class_counts, next_indices = initialize_counts(
+        output_dir,
+        mappings_by_slug,
+    )
+    return existing_rows, seen_source_paths, category_counts, class_counts, next_indices
+
+
+def prepare_collection_run_state(
+    *,
+    output_dir: Path,
+    categories: list[dict[str, Any]],
+    mappings_by_slug: dict[str, ClassMapping],
+    source_dataset: str,
+    source_split: str,
+    target_per_category: int,
+    subcategory_limits: dict[str, int],
+) -> CollectionRunState:
+    prepare_output_dirs(output_dir, mappings_by_slug.values())
+    checkpoint_metadata_path = output_dir / CHECKPOINT_METADATA_NAME
+    (
+        existing_rows,
+        seen_source_paths,
+        category_counts,
+        class_counts,
+        next_indices,
+    ) = load_existing_collection_state(
+        output_dir=output_dir,
+        mappings_by_slug=mappings_by_slug,
+        source_dataset=source_dataset,
+        source_split=source_split,
+    )
+    warn_impossible_targets(
+        categories=categories,
+        target_per_category=target_per_category,
+        subcategory_limits=subcategory_limits,
+    )
+    return CollectionRunState(
+        checkpoint_metadata_path=checkpoint_metadata_path,
+        existing_rows=existing_rows,
+        seen_source_paths=seen_source_paths,
+        category_counts=category_counts,
+        class_counts=class_counts,
+        next_indices=next_indices,
+    )
 
 
 def source_path_from_sample(sample: dict[str, Any]) -> str:
@@ -790,11 +885,12 @@ def collect_dataset_pass(
         next_indices[mapping.places365_slug] += 1
         saved += 1
 
-        print(
-            f"[SAVE:{pass_name}] {mapping.category_label}/{mapping.places365_slug} "
-            f"{class_counts[mapping.places365_slug]}장 "
-            f"(category={category_counts[mapping.category_label]})"
-        )
+        if getattr(args, "log_each_save", True):
+            print(
+                f"[SAVE:{pass_name}] {mapping.category_label}/{mapping.places365_slug} "
+                f"{class_counts[mapping.places365_slug]}장 "
+                f"(category={category_counts[mapping.category_label]})"
+            )
 
         if args.progress_every and saved % args.progress_every == 0:
             print_progress(
@@ -850,42 +946,12 @@ def main() -> None:
     if args.overwrite and output_dir.exists():
         remove_tree_inside_root(output_dir, PROJECT_ROOT)
 
-    prepare_output_dirs(output_dir, mappings_by_slug.values())
-    metadata_csv = output_dir / "metadata.csv"
-    checkpoint_metadata_csv = output_dir / CHECKPOINT_METADATA_NAME
-    raw_existing_rows = [
-        *read_metadata_csv(metadata_csv),
-        *read_metadata_csv(checkpoint_metadata_csv),
-    ]
-    existing_rows: list[dict[str, Any]] = [
-        row
-        for row in dedupe_metadata_rows(raw_existing_rows)
-        if str(row.get("places365_slug", "")) in mappings_by_slug
-        and str(row.get("label", ""))
-        == mappings_by_slug[str(row.get("places365_slug", ""))].category_label
-    ]
-    existing_rows.extend(
-        build_existing_file_rows(
-            output_dir=output_dir,
-            mappings_by_slug=mappings_by_slug,
-            source_dataset=dataset_name,
-            source_split=source_split,
-            existing_rows=existing_rows,
-        )
-    )
-
-    seen_source_paths = {
-        str(row.get("source_image_file_path", ""))
-        for row in existing_rows
-        if row.get("source_image_file_path")
-    }
-    category_counts, class_counts, next_indices = initialize_counts(
-        output_dir,
-        mappings_by_slug,
-    )
-
-    warn_impossible_targets(
+    run_state = prepare_collection_run_state(
+        output_dir=output_dir,
         categories=categories,
+        mappings_by_slug=mappings_by_slug,
+        source_dataset=dataset_name,
+        source_split=source_split,
         target_per_category=args.target_per_category,
         subcategory_limits=subcategory_limits,
     )
@@ -901,25 +967,25 @@ def main() -> None:
         mappings_by_slug=mappings_by_slug,
         mappings_by_id=mappings_by_id,
         subcategory_limits=subcategory_limits,
-        seen_source_paths=seen_source_paths,
-        category_counts=category_counts,
-        class_counts=class_counts,
-        next_indices=next_indices,
+        seen_source_paths=run_state.seen_source_paths,
+        category_counts=run_state.category_counts,
+        class_counts=run_state.class_counts,
+        next_indices=run_state.next_indices,
         new_rows=new_rows,
-        checkpoint_metadata_path=checkpoint_metadata_csv,
+        checkpoint_metadata_path=run_state.checkpoint_metadata_path,
     )
     effective_subcategory_limits = dict(subcategory_limits)
 
     if args.fill_shortfall and args.target_per_category:
         fill_limits = build_shortfall_fill_limits(
             categories=categories,
-            category_counts=category_counts,
-            class_counts=class_counts,
+            category_counts=run_state.category_counts,
+            class_counts=run_state.class_counts,
             target_per_category=args.target_per_category,
         )
         print_fill_shortfall_plan(
             categories=categories,
-            category_counts=category_counts,
+            category_counts=run_state.category_counts,
             fill_limits=fill_limits,
             target_per_category=args.target_per_category,
         )
@@ -935,15 +1001,15 @@ def main() -> None:
                 mappings_by_slug=mappings_by_slug,
                 mappings_by_id=mappings_by_id,
                 subcategory_limits=effective_subcategory_limits,
-                seen_source_paths=seen_source_paths,
-                category_counts=category_counts,
-                class_counts=class_counts,
-                next_indices=next_indices,
+                seen_source_paths=run_state.seen_source_paths,
+                category_counts=run_state.category_counts,
+                class_counts=run_state.class_counts,
+                next_indices=run_state.next_indices,
                 new_rows=new_rows,
-                checkpoint_metadata_path=checkpoint_metadata_csv,
+                checkpoint_metadata_path=run_state.checkpoint_metadata_path,
             )
 
-    rows = dedupe_metadata_rows([*existing_rows, *new_rows])
+    rows = dedupe_metadata_rows([*run_state.existing_rows, *new_rows])
     if not args.no_split:
         train, valid, test = assign_splits(
             rows,
@@ -961,8 +1027,8 @@ def main() -> None:
         output_dir,
         build_summary(
             categories=categories,
-            category_counts=category_counts,
-            class_counts=class_counts,
+            category_counts=run_state.category_counts,
+            class_counts=run_state.class_counts,
             subcategory_limits=effective_subcategory_limits,
             output_dir=output_dir,
             source_dataset=dataset_name,
@@ -977,8 +1043,8 @@ def main() -> None:
     if not args.no_split:
         print(f"split train/valid/test: {len(train)}/{len(valid)}/{len(test)}")
     print_progress(
-        category_counts=category_counts,
-        class_counts=class_counts,
+        category_counts=run_state.category_counts,
+        class_counts=run_state.class_counts,
         subcategory_limits=effective_subcategory_limits,
         categories=categories,
         total_saved=total_saved,
