@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import importlib.util
 import json
 import sys
 from collections.abc import Iterable, Mapping, Sequence
@@ -10,27 +11,56 @@ from typing import Any
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if __package__ in {None, ""} and str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.dataset.common import dhash, remove_tree_inside_root, sha256_file
+try:
+    from scripts.dataset.common import dhash, remove_tree_inside_root, sha256_file
+except ModuleNotFoundError:
+    dataset_common_path = PROJECT_ROOT / "scripts" / "dataset" / "common.py"
+    dataset_common_spec = importlib.util.spec_from_file_location(
+        "_lightrip_dataset_common",
+        dataset_common_path,
+    )
+    if dataset_common_spec is None or dataset_common_spec.loader is None:
+        raise ImportError(f"dataset common 모듈을 불러올 수 없습니다: {dataset_common_path}")
+    dataset_common = importlib.util.module_from_spec(dataset_common_spec)
+    sys.modules[dataset_common_spec.name] = dataset_common
+    dataset_common_spec.loader.exec_module(dataset_common)
+    dhash = dataset_common.dhash
+    remove_tree_inside_root = dataset_common.remove_tree_inside_root
+    sha256_file = dataset_common.sha256_file
 
 
 TITLE_DATA_ROOT = PROJECT_ROOT / "data" / "title_color_recommendation"
 TITLE_CONFIG_ROOT = PROJECT_ROOT / "configs" / "title_color_recommendation"
 TITLE_OUTPUT_ROOT = PROJECT_ROOT / "outputs" / "title_color_recommendation"
-TMP_ROOT = Path("/tmp")
 
 ALLOWED_READ_ROOTS = (
     PROJECT_ROOT.resolve(),
-    TMP_ROOT.resolve(),
 )
 ALLOWED_WRITE_ROOTS = (
     TITLE_DATA_ROOT.resolve(),
     TITLE_OUTPUT_ROOT.resolve(),
-    TMP_ROOT.resolve(),
 )
 IMAGE_SUFFIXES = frozenset({".jpg", ".jpeg", ".png", ".webp"})
+
+
+def bootstrap_project_imports() -> None:
+    try:
+        from scripts.dataset._bootstrap import bootstrap_project_root
+    except ModuleNotFoundError:
+        bootstrap_path = PROJECT_ROOT / "scripts" / "dataset" / "_bootstrap.py"
+        bootstrap_spec = importlib.util.spec_from_file_location(
+            "_lightrip_dataset_bootstrap",
+            bootstrap_path,
+        )
+        if bootstrap_spec is None or bootstrap_spec.loader is None:
+            raise ImportError(f"bootstrap 모듈을 불러올 수 없습니다: {bootstrap_path}")
+        bootstrap_module = importlib.util.module_from_spec(bootstrap_spec)
+        sys.modules[bootstrap_spec.name] = bootstrap_module
+        bootstrap_spec.loader.exec_module(bootstrap_module)
+        bootstrap_project_root = bootstrap_module.bootstrap_project_root
+
+    bootstrap_project_root()
 
 
 def utc_now() -> str:
@@ -77,7 +107,7 @@ def resolve_project_path(
     description: str = "path",
     must_exist: bool = False,
 ) -> Path:
-    path = Path(value).expanduser()
+    path = Path(value)
     if not path.is_absolute():
         path = PROJECT_ROOT / path
 
@@ -90,7 +120,7 @@ def resolve_project_path(
 def resolve_config_path(value: str | Path) -> Path:
     return resolve_project_path(
         value,
-        allowed_roots=(TITLE_CONFIG_ROOT, PROJECT_ROOT / "configs", TMP_ROOT),
+        allowed_roots=(TITLE_CONFIG_ROOT, PROJECT_ROOT / "configs"),
         description="config path",
         must_exist=True,
     )
@@ -156,7 +186,7 @@ def resolve_input_image_path(value: str, *, raw_dir: Path) -> Path:
         raise ValueError("image_path가 비어 있습니다.")
 
     raw_root = raw_dir.resolve(strict=False)
-    supplied = Path(value).expanduser()
+    supplied = Path(value)
     candidates = (
         [supplied]
         if supplied.is_absolute()
@@ -175,7 +205,14 @@ def resolve_input_image_path(value: str, *, raw_dir: Path) -> Path:
 
 
 def read_csv_rows(path: Path) -> tuple[list[dict[str, str]], list[str]]:
-    with path.open("r", encoding="utf-8", newline="") as file:
+    if path.exists() and path.is_symlink():
+        raise ValueError(f"심볼릭 링크 입력 파일은 허용하지 않습니다: {path}")
+    resolved = require_within_roots(
+        path,
+        ALLOWED_READ_ROOTS,
+        description="metadata input",
+    )
+    with resolved.open("r", encoding="utf-8", newline="") as file:
         reader = csv.DictReader(file)
         return [dict(row) for row in reader], list(reader.fieldnames or [])
 
@@ -185,9 +222,11 @@ def write_csv_rows(
     rows: Iterable[Mapping[str, Any]],
     fieldnames: Sequence[str],
 ) -> None:
-    require_within_roots(path, ALLOWED_WRITE_ROOTS, description="metadata output")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="") as file:
+    if path.exists() and path.is_symlink():
+        raise ValueError(f"심볼릭 링크 출력 파일은 허용하지 않습니다: {path}")
+    resolved = require_within_roots(path, ALLOWED_WRITE_ROOTS, description="metadata output")
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    with resolved.open("w", encoding="utf-8", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
         for row in rows:
@@ -195,9 +234,11 @@ def write_csv_rows(
 
 
 def write_json_file(path: Path, payload: Mapping[str, Any]) -> None:
-    require_within_roots(path, ALLOWED_WRITE_ROOTS, description="summary output")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
+    if path.exists() and path.is_symlink():
+        raise ValueError(f"심볼릭 링크 출력 파일은 허용하지 않습니다: {path}")
+    resolved = require_within_roots(path, ALLOWED_WRITE_ROOTS, description="summary output")
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    resolved.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )

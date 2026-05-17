@@ -9,6 +9,7 @@ from typing import Any
 try:
     from scripts.title_color_recommendation.common import (
         PROJECT_ROOT,
+        bootstrap_project_imports,
         clear_output_dir,
         ensure_output_dir,
         project_relative,
@@ -18,12 +19,15 @@ try:
 except ModuleNotFoundError:
     from common import (  # type: ignore[no-redef]
         PROJECT_ROOT,
+        bootstrap_project_imports,
         clear_output_dir,
         ensure_output_dir,
         project_relative,
         resolve_config_path,
         resolve_output_path,
     )
+
+bootstrap_project_imports()
 
 from scripts.dataset.collect_places365_v2 import (
     build_class_maps,

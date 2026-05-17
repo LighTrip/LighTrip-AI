@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+try:
+    from _bootstrap import bootstrap_project_root
+except ModuleNotFoundError:
+    from scripts.dataset._bootstrap import bootstrap_project_root
+
+bootstrap_project_root()
 
 from scripts.dataset.common import read_jsonl, write_jsonl
 

@@ -14,7 +14,6 @@ try:
         IMAGE_SUFFIXES,
         PROJECT_ROOT,
         TITLE_DATA_ROOT,
-        TMP_ROOT,
         clear_output_dir,
         dhash,
         ensure_output_dir,
@@ -35,7 +34,6 @@ except ModuleNotFoundError:
         IMAGE_SUFFIXES,
         PROJECT_ROOT,
         TITLE_DATA_ROOT,
-        TMP_ROOT,
         clear_output_dir,
         dhash,
         ensure_output_dir,
@@ -350,7 +348,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def configure_paths(args: argparse.Namespace) -> None:
-    read_roots = (TITLE_DATA_ROOT, TMP_ROOT)
+    read_roots = (TITLE_DATA_ROOT,)
     args.raw_dir = resolve_project_path(
         args.raw_dir,
         allowed_roots=read_roots,
