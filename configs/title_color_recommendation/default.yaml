@@ -47,8 +47,25 @@ preprocessing:
 
 labeling:
   temperature: 0.2
+  comparison_temperatures:
+    - 0.5
+    - 1.0
   contrast_threshold: 4.5
   min_contrast_p05: 3.0
+  contrast_normalization:
+    min: 1.0
+    max: 4.5
+  preview_sample_count: 50
+  weights:
+    readability_score: 0.70
+    aesthetic_prior: 0.15
+    tone_match_score: 0.10
+    simplicity_score: 0.05
+    fail_penalty: 0.30
+    readability:
+      p05: 0.50
+      p10: 0.35
+      mean: 0.15
 
 training:
   batch_size: 64
