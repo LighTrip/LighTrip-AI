@@ -13,23 +13,29 @@ paths:
   preview_dir: outputs/title_color_recommendation/previews
 
 input_size:
-  height: 128
-  width: 256
+  height: 200
+  width: 150
 
 roi:
   x1: 0.05
-  y1: 0.15
+  y1: 0.18
   x2: 0.95
-  y2: 0.50
+  y2: 0.36
 
 title:
   center_x: 0.5
-  center_y: 0.333
+  center_y: 0.284
+  font_size: 22
+  text: TITLE
+  font_path: /home/cvlab/.local/share/fonts/Freesentation-4Regular.ttf
 
 palette:
   num_colors: 32
 
 preprocessing:
+  crop_seed: 42
+  default_split: train
+  preview_sample_count: 50
   image_extensions:
     - .jpg
     - .jpeg
