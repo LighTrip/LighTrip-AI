@@ -9,8 +9,9 @@ import hashlib
 import json
 import math
 from collections import Counter, defaultdict
+from contextlib import ExitStack
 from pathlib import Path
-from typing import Any, TextIO
+from typing import Any
 
 import numpy as np
 import yaml
@@ -61,6 +62,7 @@ from src.title_color_recommendation.labeling.soft_labels import (
     soft_label_config_from_mapping,
     softmax,
 )
+from src.title_color_recommendation.data.roi_preprocessing import resampling_lanczos
 
 
 DEFAULT_CONFIG = PROJECT_ROOT / "configs/title_color_recommendation/default.yaml"
@@ -296,14 +298,18 @@ def neutral_bias_group(color: PaletteColor) -> bool:
     return color.group in {"neutral_light", "neutral_dark", "muted"}
 
 
-def open_csv_writer(path: Path, fieldnames: list[str]) -> tuple[csv.DictWriter, TextIO]:
+def open_csv_writer(
+    stack: ExitStack,
+    path: Path,
+    fieldnames: list[str],
+) -> csv.DictWriter:
     if path.exists() and path.is_symlink():
         raise ValueError(f"심볼릭 링크 출력 파일은 허용하지 않습니다: {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
-    file = path.open("w", encoding="utf-8", newline="")
+    file = stack.enter_context(path.open("w", encoding="utf-8", newline=""))
     writer = csv.DictWriter(file, fieldnames=fieldnames, extrasaction="ignore")
     writer.writeheader()
-    return writer, file
+    return writer
 
 
 def contrast_row(
@@ -385,7 +391,7 @@ def scale_panel(image: Image.Image, *, height: int) -> Image.Image:
     if image.height == height:
         return image.copy()
     width = max(1, round(image.width * (height / image.height)))
-    return image.resize((width, height), resample=Image.Resampling.LANCZOS)
+    return image.resize((width, height), resample=resampling_lanczos())
 
 
 def save_preview(
@@ -530,20 +536,6 @@ def main() -> None:
     entropy_values: dict[float, list[float]] = {temperature: [] for temperature in temperatures}
     max_probability_values: dict[float, list[float]] = {temperature: [] for temperature in temperatures}
 
-    open_files: list[TextIO] = []
-    contrast_writer, contrast_file = open_csv_writer(args.contrast_features, CONTRAST_FIELDS)
-    open_files.append(contrast_file)
-    for temperature in temperatures:
-        label_path = args.labels_soft
-        if temperature != primary_temperature:
-            label_path = args.label_dir / f"labels_soft_{temperature_suffix(temperature)}.csv"
-        writer, file = open_csv_writer(
-            resolve_output_path(label_path, description="soft label csv"),
-            LABEL_FIELDS,
-        )
-        writers[temperature] = writer
-        open_files.append(file)
-
     index_rows: list[dict[str, Any]] = []
     top1_color_counts: Counter[int] = Counter()
     top1_group_counts: Counter[str] = Counter()
@@ -557,7 +549,18 @@ def main() -> None:
     preview_candidates: dict[str, list[tuple[str, dict[str, Any]]]] = defaultdict(list)
     max_preview_per_bucket = max(1, math.ceil(max(args.preview_count, 1) / 3) * 2)
 
-    try:
+    with ExitStack() as stack:
+        contrast_writer = open_csv_writer(stack, args.contrast_features, CONTRAST_FIELDS)
+        for temperature in temperatures:
+            label_path = args.labels_soft
+            if temperature != primary_temperature:
+                label_path = args.label_dir / f"labels_soft_{temperature_suffix(temperature)}.csv"
+            writers[temperature] = open_csv_writer(
+                stack,
+                resolve_output_path(label_path, description="soft label csv"),
+                LABEL_FIELDS,
+            )
+
         for row_index, row in enumerate(rows, start=1):
             roi_path: Path | None = None
             mask_path: Path | None = None
@@ -692,9 +695,6 @@ def main() -> None:
                     f"[PROGRESS] {row_index}/{len(rows)} "
                     f"processed={len(index_rows)} skipped={skipped}"
                 )
-    finally:
-        for file in open_files:
-            file.close()
 
     if matrix_rows[primary_temperature]:
         primary_matrix = np.vstack(matrix_rows[primary_temperature]).astype(np.float32)
