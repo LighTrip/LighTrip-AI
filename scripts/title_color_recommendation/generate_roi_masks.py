@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
-import random
 import warnings
 from pathlib import Path
 from typing import Any
@@ -65,7 +65,6 @@ from src.title_color_recommendation.data.roi_preprocessing import (
     resampling_lanczos,
     resampling_nearest,
     split_to_crop_mode,
-    stable_random,
     title_spec_from_config,
 )
 
@@ -163,12 +162,12 @@ def choose_preview_ids(
 ) -> set[str]:
     if count <= 0:
         return set()
-    keyed: list[tuple[float, str]] = []
-    sampler = random.Random(seed)
+    keyed: list[tuple[str, str]] = []
     for row in rows:
         row_id = str(row.get("id") or row.get("clean_path") or "")
         if row_id:
-            keyed.append((sampler.random(), row_id))
+            digest = hashlib.sha256(f"{seed}:preview:{row_id}".encode("utf-8")).hexdigest()
+            keyed.append((digest, row_id))
     keyed.sort()
     return {row_id for _, row_id in keyed[:count]}
 
@@ -383,7 +382,6 @@ def main() -> None:
             image_id = image_id_for_row(row, clean_path)
             split = split_for_row(row, args.default_split)
             crop_mode = split_to_crop_mode(split) if args.crop_mode == "auto" else args.crop_mode
-            rng = stable_random(args.seed, f"{split}:{image_id}") if crop_mode == "random" else None
 
             with Image.open(clean_path) as opened:
                 opened.load()
@@ -395,7 +393,8 @@ def main() -> None:
                     roi=roi,
                     title=title,
                     crop_mode=crop_mode,
-                    rng=rng,
+                    seed=args.seed if crop_mode == "random" else None,
+                    key=f"{split}:{image_id}",
                 )
 
             roi_path = safe_child_path(args.roi_dir, f"{image_id}.jpg")

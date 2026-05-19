@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import random
-
 from PIL import Image
 
 from src.title_color_recommendation.data.roi_preprocessing import (
@@ -32,7 +30,7 @@ def test_crop_offsets_center_and_random_are_valid() -> None:
 
     assert crop_offsets(source, target, mode="center") == (125, 0)
 
-    left, top = crop_offsets(source, target, mode="random", rng=random.Random(7))
+    left, top = crop_offsets(source, target, mode="random", seed=7, key="sample")
     assert 0 <= left <= 250
     assert top == 0
 

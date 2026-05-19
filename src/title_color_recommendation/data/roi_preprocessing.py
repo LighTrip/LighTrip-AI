@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import hashlib
 import math
-import random
+import secrets
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Protocol
 
 from PIL import Image, ImageDraw, ImageFont
+
+
+class RandIntGenerator(Protocol):
+    def randint(self, a: int, b: int) -> int:
+        """Return a random integer N such that a <= N <= b."""
 
 
 @dataclass(frozen=True)
@@ -126,9 +131,11 @@ def resize_keep_aspect_for_crop(
     )
 
 
-def stable_random(seed: int, key: str) -> random.Random:
+def stable_int(seed: int, key: str, *, max_value: int) -> int:
+    if max_value <= 0:
+        return 0
     digest = hashlib.sha256(f"{seed}:{key}".encode("utf-8")).digest()
-    return random.Random(int.from_bytes(digest[:8], byteorder="big", signed=False))
+    return int.from_bytes(digest[:8], byteorder="big", signed=False) % (max_value + 1)
 
 
 def split_to_crop_mode(split: str) -> str:
@@ -140,7 +147,9 @@ def crop_offsets(
     target_size: ImageSize,
     *,
     mode: str,
-    rng: random.Random | None = None,
+    rng: RandIntGenerator | None = None,
+    seed: int | None = None,
+    key: str = "",
 ) -> tuple[int, int]:
     validate_image_size(source_size, name="source_size")
     validate_image_size(target_size, name="target_size")
@@ -156,8 +165,14 @@ def crop_offsets(
     if mode == "center":
         return max_x // 2, max_y // 2
     if mode == "random":
-        generator = rng or random.Random()
-        return generator.randint(0, max_x), generator.randint(0, max_y)
+        if seed is not None and key:
+            return (
+                stable_int(seed, f"{key}:x", max_value=max_x),
+                stable_int(seed, f"{key}:y", max_value=max_y),
+            )
+        if rng is not None:
+            return rng.randint(0, max_x), rng.randint(0, max_y)
+        return secrets.randbelow(max_x + 1), secrets.randbelow(max_y + 1)
     raise ValueError(f"Unsupported crop mode: {mode}")
 
 
@@ -166,11 +181,20 @@ def crop_to_input_size(
     target_size: ImageSize,
     *,
     mode: str,
-    rng: random.Random | None = None,
+    rng: RandIntGenerator | None = None,
+    seed: int | None = None,
+    key: str = "",
 ) -> tuple[Image.Image, ImageSize, tuple[int, int, int, int]]:
     resized = resize_keep_aspect_for_crop(image, target_size)
     resized_size = ImageSize(width=resized.width, height=resized.height)
-    left, top = crop_offsets(resized_size, target_size, mode=mode, rng=rng)
+    left, top = crop_offsets(
+        resized_size,
+        target_size,
+        mode=mode,
+        rng=rng,
+        seed=seed,
+        key=key,
+    )
     box = (left, top, left + target_size.width, top + target_size.height)
     return resized.crop(box), resized_size, box
 
@@ -264,7 +288,9 @@ def prepare_title_roi(
     roi: RelativeROI,
     title: TitleSpec,
     crop_mode: str,
-    rng: random.Random | None = None,
+    rng: RandIntGenerator | None = None,
+    seed: int | None = None,
+    key: str = "",
     text: str | None = None,
 ) -> TitleROIResult:
     cropped_image, resized_size, crop_box = crop_to_input_size(
@@ -272,6 +298,8 @@ def prepare_title_roi(
         input_size,
         mode=crop_mode,
         rng=rng,
+        seed=seed,
+        key=key,
     )
     roi_image, roi_box = crop_roi(cropped_image, roi)
     roi_size = ImageSize(width=roi_image.width, height=roi_image.height)
