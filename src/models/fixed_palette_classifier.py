@@ -6,6 +6,7 @@ from typing import Any
 import torch
 from torch import Tensor, nn
 from torchvision.models import ResNet18_Weights, resnet18
+from torchvision.models.resnet import ResNet
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_NUM_CLASSES = 32
@@ -18,9 +19,7 @@ def _resolve_resnet18_weights(
     weights: ResNet18_Weights | str | None,
 ) -> ResNet18_Weights | None:
     if weights is not None:
-        if isinstance(weights, str):
-            return ResNet18_Weights[weights]
-        return weights
+        return ResNet18_Weights.verify(weights)
     if pretrained:
         return ResNet18_Weights.DEFAULT
     return None
@@ -30,7 +29,7 @@ def _build_resnet18_backbone(
     *,
     pretrained: bool,
     weights: ResNet18_Weights | str | None,
-) -> nn.Module:
+) -> ResNet:
     resolved_weights = _resolve_resnet18_weights(
         pretrained=pretrained,
         weights=weights,
@@ -81,6 +80,15 @@ def _make_classifier_head(
     )
 
 
+def _resnet_fc_in_features(fc_layer: nn.Module) -> int:
+    if not isinstance(fc_layer, nn.Linear):
+        raise TypeError(
+            "Expected ResNet18 backbone.fc to be nn.Linear before replacement: "
+            f"actual={type(fc_layer).__name__}"
+        )
+    return int(fc_layer.in_features)
+
+
 class FixedPaletteResNet18Classifier(nn.Module):
     """ResNet18 classifier for ROI RGB plus text mask inputs."""
 
@@ -92,20 +100,22 @@ class FixedPaletteResNet18Classifier(nn.Module):
         dropout: float = 0.2,
         pretrained: bool = True,
         weights: ResNet18_Weights | str | None = None,
-        backbone: nn.Module | None = None,
+        backbone: ResNet | None = None,
     ) -> None:
         super().__init__()
         self.num_classes = num_classes
         self.hidden_dim = hidden_dim
         self.dropout = dropout
 
-        self.backbone = backbone or _build_resnet18_backbone(
-            pretrained=pretrained,
-            weights=weights,
-        )
+        self.backbone = backbone
+        if self.backbone is None:
+            self.backbone = _build_resnet18_backbone(
+                pretrained=pretrained,
+                weights=weights,
+            )
         self.backbone.conv1 = _make_four_channel_conv1(self.backbone.conv1)
 
-        in_features = int(self.backbone.fc.in_features)
+        in_features = _resnet_fc_in_features(self.backbone.fc)
         self.backbone.fc = _make_classifier_head(
             in_features=in_features,
             hidden_dim=hidden_dim,
@@ -156,12 +166,14 @@ def model_summary(
     model_device = torch.device(device)
     was_training = model.training
     model = model.to(model_device)
-    model.eval()
-    with torch.no_grad():
-        example = torch.zeros((batch_size, *input_shape), device=model_device)
-        output = model(example)
-    if was_training:
-        model.train()
+    try:
+        model.eval()
+        with torch.no_grad():
+            example = torch.zeros((batch_size, *input_shape), device=model_device)
+            output = model(example)
+    finally:
+        if was_training:
+            model.train()
     return {
         "total_parameters": count_total_parameters(model),
         "trainable_parameters": count_trainable_parameters(model),
@@ -184,7 +196,7 @@ def log_model_summary(
         input_shape=input_shape,
         device=device,
     )
-    target_logger = logger or LOGGER
+    target_logger = LOGGER if logger is None else logger
     target_logger.info(
         "FixedPaletteResNet18Classifier parameters: total=%s trainable=%s",
         summary["total_parameters"],
