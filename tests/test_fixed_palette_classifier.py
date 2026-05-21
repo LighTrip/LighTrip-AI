@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any
 
 import pytest
@@ -89,7 +90,7 @@ def test_classifier_head_outputs_32_logits(
     assert classifier_head[0].out_features == 256
     assert isinstance(classifier_head[1], nn_module.ReLU)
     assert isinstance(classifier_head[2], nn_module.Dropout)
-    assert classifier_head[2].p == 0.2
+    assert math.isclose(classifier_head[2].p, 0.2, rel_tol=0.0, abs_tol=1e-12)
     assert isinstance(classifier_head[3], nn_module.Linear)
     assert classifier_head[3].in_features == 256
     assert classifier_head[3].out_features == 32
