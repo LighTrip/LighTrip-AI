@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import csv
-import random
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -397,16 +396,23 @@ class TitleColorDataset(TorchDataset):
         roi: Image.Image,
         mask: Image.Image,
     ) -> tuple[Image.Image, Image.Image]:
+        torch_module = require_torch()
         config = self.augmentation
-        if random.random() < config.flip_p:
+        if float(torch_module.rand(()).item()) < config.flip_p:
             roi = ImageOps.mirror(roi)
             mask = ImageOps.mirror(mask)
 
         if config.brightness > 0:
-            factor = 1.0 + random.uniform(-config.brightness, config.brightness)
+            factor = self._jitter_factor(config.brightness)
             roi = ImageEnhance.Brightness(roi).enhance(factor)
         if config.contrast > 0:
-            factor = 1.0 + random.uniform(-config.contrast, config.contrast)
+            factor = self._jitter_factor(config.contrast)
             roi = ImageEnhance.Contrast(roi).enhance(factor)
 
         return roi, mask
+
+    def _jitter_factor(self, strength: float) -> float:
+        torch_module = require_torch()
+        low = 1.0 - strength
+        high = 1.0 + strength
+        return float(torch_module.empty(()).uniform_(low, high).item())

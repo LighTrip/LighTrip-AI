@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import random
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
-
-import numpy as np
 
 try:
     import torch
@@ -26,6 +23,7 @@ from src.title_color_recommendation.data.dataset import (
     manifest_items_from_rows,
     normalize_split,
     read_manifest_rows,
+    require_torch,
     resolve_path,
 )
 
@@ -37,13 +35,6 @@ def require_dataloader() -> Any:
             "Install torch before constructing dataloaders."
         )
     return DataLoader
-
-
-def seed_worker(worker_id: int) -> None:
-    del worker_id
-    worker_seed = torch.initial_seed() % 2**32  # type: ignore[union-attr]
-    np.random.seed(worker_seed)
-    random.seed(worker_seed)
 
 
 def create_title_color_dataset(
@@ -88,7 +79,8 @@ def create_title_color_dataloader(
 
     generator = None
     if seed is not None:
-        generator = torch.Generator()  # type: ignore[union-attr]
+        torch_module = require_torch()
+        generator = torch_module.Generator()
         generator.manual_seed(seed)
 
     if shuffle is None:
@@ -101,7 +93,6 @@ def create_title_color_dataloader(
         num_workers=num_workers,
         pin_memory=pin_memory,
         drop_last=drop_last,
-        worker_init_fn=seed_worker if seed is not None else None,
         generator=generator,
     )
 
@@ -190,7 +181,8 @@ def create_title_color_dataloaders(
 
     generator = None
     if seed is not None:
-        generator = torch.Generator()  # type: ignore[union-attr]
+        torch_module = require_torch()
+        generator = torch_module.Generator()
         generator.manual_seed(seed)
 
     return {
@@ -201,7 +193,6 @@ def create_title_color_dataloaders(
             num_workers=num_workers,
             pin_memory=pin_memory,
             drop_last=drop_last,
-            worker_init_fn=seed_worker if seed is not None else None,
             generator=generator,
         )
         for split, dataset in datasets.items()
@@ -233,9 +224,10 @@ def validate_title_color_batch(
         )
 
     sums = target_distribution.sum(dim=1)
-    if not torch.allclose(  # type: ignore[union-attr]
+    torch_module = require_torch()
+    if not torch_module.allclose(
         sums,
-        torch.ones_like(sums),  # type: ignore[union-attr]
+        torch_module.ones_like(sums),
         atol=1e-4,
     ):
         raise ValueError("target_distribution rows must sum to 1.0")
