@@ -1,0 +1,53 @@
+{
+  "description": "Validation-driven hyperparameter sweep for the title color ResNet18 baseline.",
+  "base": {
+    "batch_size": 64,
+    "epochs": 20,
+    "learning_rate": 0.0003,
+    "weight_decay": 0.0001,
+    "num_classes": 32,
+    "num_workers": 4,
+    "device": "cuda",
+    "scheduler": "cosine",
+    "best_metric": "val_loss",
+    "seed": 42
+  },
+  "trials": [
+    {
+      "name": "lr_1e-4_wd_1e-4_cosine",
+      "learning_rate": 0.0001,
+      "weight_decay": 0.0001,
+      "scheduler": "cosine"
+    },
+    {
+      "name": "lr_3e-4_wd_1e-4_cosine",
+      "learning_rate": 0.0003,
+      "weight_decay": 0.0001,
+      "scheduler": "cosine"
+    },
+    {
+      "name": "lr_5e-4_wd_1e-4_cosine",
+      "learning_rate": 0.0005,
+      "weight_decay": 0.0001,
+      "scheduler": "cosine"
+    },
+    {
+      "name": "lr_3e-4_wd_0_cosine",
+      "learning_rate": 0.0003,
+      "weight_decay": 0.0,
+      "scheduler": "cosine"
+    },
+    {
+      "name": "lr_3e-4_wd_5e-4_cosine",
+      "learning_rate": 0.0003,
+      "weight_decay": 0.0005,
+      "scheduler": "cosine"
+    },
+    {
+      "name": "lr_3e-4_wd_1e-4_plateau",
+      "learning_rate": 0.0003,
+      "weight_decay": 0.0001,
+      "scheduler": "plateau"
+    }
+  ]
+}
