@@ -58,7 +58,7 @@ def test_compute_image_soft_labels_prefers_light_text_on_dark_background() -> No
     )
 
     assert result.contrast_p05[0] > 20.0
-    assert result.contrast_p05[1] == 1.0
+    assert np.isclose(float(result.contrast_p05[1]), 1.0)
     assert bool(result.wcag_pass[0])
     assert not bool(result.wcag_pass[1])
     assert int(np.argmax(result.target_distribution)) == 0
@@ -82,7 +82,7 @@ def test_compute_image_soft_labels_uses_text_mask_pixels_for_contrast() -> None:
 
     assert result.background.text_pixel_count == 8
     assert result.contrast_p05[0] > 20.0
-    assert result.contrast_p05[1] == 1.0
+    assert np.isclose(float(result.contrast_p05[1]), 1.0)
 
 
 def test_fail_penalty_increases_when_low_percentiles_fail() -> None:
@@ -93,7 +93,7 @@ def test_fail_penalty_increases_when_low_percentiles_fail() -> None:
         config,
     )
 
-    assert penalty[0] == 0.0
+    assert np.isclose(float(penalty[0]), 0.0)
     assert penalty[1] > 0.0
 
 

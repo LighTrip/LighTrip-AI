@@ -19,7 +19,7 @@ from src.title_color_recommendation.data.dataset import (
     TitleColorAugmentationConfig,
     TitleColorDataset,
     load_label_matrix,
-    load_pseudo_scores,
+    load_soft_label_vectors,
     manifest_items_from_rows,
     normalize_split,
     read_manifest_rows,
@@ -138,7 +138,7 @@ def create_title_color_datasets(
             project_root=project_root_path,
         )
     ]
-    pseudo_scores_by_id = load_pseudo_scores(
+    pseudo_scores_by_id, wcag_pass_by_id = load_soft_label_vectors(
         labels_soft_path,
         all_image_ids,
         num_classes=num_classes,
@@ -152,6 +152,7 @@ def create_title_color_datasets(
             rows=rows,
             labels_matrix=labels_matrix,
             pseudo_scores_by_id=pseudo_scores_by_id,
+            wcag_pass_by_id=wcag_pass_by_id,
             image_size=image_size,
             augmentation=augmentation,
         )
@@ -209,6 +210,7 @@ def validate_title_color_batch(
     x = batch["x"]
     pseudo_scores = batch["pseudo_scores"]
     target_distribution = batch["target_distribution"]
+    wcag_pass = batch.get("wcag_pass")
 
     if tuple(x.shape[1:]) != (4, height, width):
         raise ValueError(f"x batch shape must be [B, 4, {height}, {width}]: {x.shape}")
@@ -221,6 +223,11 @@ def validate_title_color_batch(
         raise ValueError(
             f"target_distribution batch shape must be [B, {num_classes}]: "
             f"{target_distribution.shape}"
+        )
+    if wcag_pass is not None and tuple(wcag_pass.shape[1:]) != (num_classes,):
+        raise ValueError(
+            f"wcag_pass batch shape must be [B, {num_classes}]: "
+            f"{wcag_pass.shape}"
         )
 
     sums = target_distribution.sum(dim=1)

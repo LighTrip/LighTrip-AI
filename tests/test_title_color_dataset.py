@@ -56,6 +56,10 @@ def _make_mask(path: Path) -> None:
     mask.save(path)
 
 
+def _relative_path(path: Path, root: Path) -> str:
+    return str(path.relative_to(root))
+
+
 def _make_dataset_files(tmp_path: Path) -> Path:
     data_root = tmp_path / "data" / "title_color_recommendation"
     splits_dir = data_root / "splits"
@@ -89,7 +93,7 @@ def _make_dataset_files(tmp_path: Path) -> Path:
     with (labels_dir / "labels_soft.csv").open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
             f,
-            fieldnames=["id", "split", "palette_id", "pseudo_score"],
+            fieldnames=["id", "split", "palette_id", "pseudo_score", "wcag_pass"],
         )
         writer.writeheader()
         for split, image_ids in split_to_ids.items():
@@ -101,6 +105,7 @@ def _make_dataset_files(tmp_path: Path) -> Path:
                             "split": split,
                             "palette_id": str(palette_id),
                             "pseudo_score": f"{palette_id / 31:.6f}",
+                            "wcag_pass": str(int(palette_id % 2 == 0)),
                         }
                     )
 
@@ -115,8 +120,14 @@ def _make_dataset_files(tmp_path: Path) -> Path:
                 {
                     "id": image_id,
                     "split": split,
-                    "roi_path": str((roi_dir / f"{image_id}.png").relative_to(tmp_path)),
-                    "mask_path": str((mask_dir / f"{image_id}.png").relative_to(tmp_path)),
+                    "roi_path": _relative_path(
+                        roi_dir / f"{image_id}.png",
+                        tmp_path,
+                    ),
+                    "mask_path": _relative_path(
+                        mask_dir / f"{image_id}.png",
+                        tmp_path,
+                    ),
                     "label_matrix_index": matrix_index_by_id[image_id],
                 }
             )
@@ -142,6 +153,7 @@ def test_title_color_dataset_loads_four_channel_sample(tmp_path: Path) -> None:
     assert tuple(sample["x"].shape) == (4, 36, 136)
     assert tuple(sample["pseudo_scores"].shape) == (32,)
     assert tuple(sample["target_distribution"].shape) == (32,)
+    assert tuple(sample["wcag_pass"].shape) == (32,)
     assert torch.isclose(sample["target_distribution"].sum(), torch.tensor(1.0))
     assert set(sample["x"][3].unique().tolist()) <= {0.0, 1.0}
 
@@ -164,6 +176,7 @@ def test_title_color_dataloader_batches_have_expected_shapes(tmp_path: Path) -> 
     assert tuple(batch["x"].shape) == (2, 4, 36, 136)
     assert tuple(batch["pseudo_scores"].shape) == (2, 32)
     assert tuple(batch["target_distribution"].shape) == (2, 32)
+    assert tuple(batch["wcag_pass"].shape) == (2, 32)
     assert torch.allclose(batch["target_distribution"].sum(dim=1), torch.ones(2))
     assert batch["image_id"] == ["train_0", "train_1"]
 
@@ -216,9 +229,9 @@ def test_train_only_augmentation_flips_roi_and_mask_together(
     train_x = train_dataset[0]["x"]
     val_x = val_dataset[0]["x"]
 
-    assert train_x[0, 0, 0] == 0.0
-    assert train_x[2, 0, 0] == 1.0
-    assert train_x[3, 0, 0] == 0.0
-    assert val_x[0, 0, 0] == 1.0
-    assert val_x[2, 0, 0] == 0.0
-    assert val_x[3, 0, 0] == 1.0
+    assert torch.isclose(train_x[0, 0, 0], torch.tensor(0.0))
+    assert torch.isclose(train_x[2, 0, 0], torch.tensor(1.0))
+    assert torch.isclose(train_x[3, 0, 0], torch.tensor(0.0))
+    assert torch.isclose(val_x[0, 0, 0], torch.tensor(1.0))
+    assert torch.isclose(val_x[2, 0, 0], torch.tensor(0.0))
+    assert torch.isclose(val_x[3, 0, 0], torch.tensor(1.0))

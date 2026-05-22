@@ -14,6 +14,14 @@ from src.title_color_recommendation.data.roi_preprocessing import (
 )
 
 
+def _flattened_image_data(image: Image.Image):
+    get_flattened_data = getattr(image, "get_flattened_data", None)
+    if callable(get_flattened_data):
+        return get_flattened_data()
+    get_legacy_data = getattr(image, "getdata")
+    return get_legacy_data()
+
+
 def test_resized_size_preserves_aspect_and_covers_target() -> None:
     target = ImageSize(width=150, height=200)
 
@@ -59,7 +67,7 @@ def test_prepare_title_roi_keeps_native_roi_size_and_binary_mask() -> None:
     assert result.cropped_image.size == (150, 200)
     assert result.roi_image.size == (136, 36)
     assert result.text_mask.size == result.roi_image.size
-    assert set(result.text_mask.getdata()) <= {0, 255}
+    assert set(_flattened_image_data(result.text_mask)) <= {0, 255}
     assert result.text_mask.getbbox() is not None
 
 
