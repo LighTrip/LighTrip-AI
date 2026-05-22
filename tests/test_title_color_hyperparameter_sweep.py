@@ -9,6 +9,11 @@ from typing import Any
 
 import pytest
 
+from tests.title_color_experiment_helpers import (
+    TinyTitleColorDataset,
+    tiny_classifier,
+)
+
 
 @pytest.fixture()
 def torch_module() -> Any:
@@ -25,38 +30,6 @@ def sweep_module() -> Any:
     pytest.importorskip("torch")
     return pytest.importorskip(
         "experiments.title_color_recommendation.run_hyperparameter_sweep"
-    )
-
-
-class TinyTitleColorDataset:
-    def __init__(self, torch_module: Any, *, length: int) -> None:
-        self.torch = torch_module
-        self.length = length
-
-    def __len__(self) -> int:
-        return self.length
-
-    def __getitem__(self, index: int) -> dict[str, Any]:
-        x = self.torch.full((4, 4, 4), float(index + 1) / 10.0)
-        target = self.torch.zeros(32, dtype=self.torch.float32)
-        target[index % 32] = 0.7
-        target[(index + 1) % 32] = 0.3
-        pseudo_scores = self.torch.linspace(0.0, 1.0, steps=32)
-        wcag_pass = self.torch.zeros(32, dtype=self.torch.float32)
-        wcag_pass[::2] = 1.0
-        return {
-            "x": x,
-            "target_distribution": target,
-            "pseudo_scores": pseudo_scores,
-            "wcag_pass": wcag_pass,
-            "image_id": f"sample_{index}",
-        }
-
-
-def _tiny_classifier(nn_module: Any) -> Any:
-    return nn_module.Sequential(
-        nn_module.Flatten(),
-        nn_module.Linear(4 * 4 * 4, 32),
     )
 
 
@@ -187,7 +160,7 @@ def test_run_sweep_writes_ranking_report_and_artifacts(
     monkeypatch.setattr(
         sweep_module,
         "build_fixed_palette_resnet18",
-        lambda **_kwargs: _tiny_classifier(nn_module),
+        lambda **_kwargs: tiny_classifier(nn_module),
     )
 
     args = sweep_module.parse_args(

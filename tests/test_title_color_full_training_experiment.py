@@ -8,6 +8,11 @@ from typing import Any
 
 import pytest
 
+from tests.title_color_experiment_helpers import (
+    tiny_classifier,
+    tiny_split_loaders,
+)
+
 
 @pytest.fixture()
 def torch_module() -> Any:
@@ -25,43 +30,6 @@ def full_training_module() -> Any:
     return pytest.importorskip(
         "experiments.title_color_recommendation.run_full_training"
     )
-
-
-class TinyTitleColorDataset:
-    def __init__(self, torch_module: Any, *, length: int) -> None:
-        self.torch = torch_module
-        self.length = length
-
-    def __len__(self) -> int:
-        return self.length
-
-    def __getitem__(self, index: int) -> dict[str, Any]:
-        x = self.torch.full((4, 4, 4), float(index + 1) / 10.0)
-        target = self.torch.zeros(32, dtype=self.torch.float32)
-        target[index % 32] = 0.7
-        target[(index + 1) % 32] = 0.3
-        pseudo_scores = self.torch.linspace(0.0, 1.0, steps=32)
-        wcag_pass = self.torch.zeros(32, dtype=self.torch.float32)
-        wcag_pass[::2] = 1.0
-        return {
-            "x": x,
-            "target_distribution": target,
-            "pseudo_scores": pseudo_scores,
-            "wcag_pass": wcag_pass,
-            "image_id": f"sample_{index}",
-        }
-
-
-def _tiny_classifier(nn_module: Any) -> Any:
-    return nn_module.Sequential(
-        nn_module.Flatten(),
-        nn_module.Linear(4 * 4 * 4, 32),
-    )
-
-
-def _loader(torch_module: Any, dataset: TinyTitleColorDataset) -> Any:
-    data_module = pytest.importorskip("torch.utils.data")
-    return data_module.DataLoader(dataset, batch_size=2, shuffle=False)
 
 
 def test_build_training_config_uses_full_training_defaults(
@@ -154,31 +122,15 @@ def test_run_executes_one_epoch_with_stubbed_loaders(
 
     monkeypatch.setenv("MPLCONFIGDIR", str(tmp_path / "matplotlib"))
 
-    def create_loaders(**_kwargs: Any) -> dict[str, Any]:
-        return {
-            "train": _loader(
-                torch_module,
-                TinyTitleColorDataset(torch_module, length=4),
-            ),
-            "val": _loader(
-                torch_module,
-                TinyTitleColorDataset(torch_module, length=2),
-            ),
-            "test": _loader(
-                torch_module,
-                TinyTitleColorDataset(torch_module, length=2),
-            ),
-        }
-
     monkeypatch.setattr(
         full_training_module,
         "create_title_color_dataloaders",
-        create_loaders,
+        lambda **_kwargs: tiny_split_loaders(torch_module),
     )
     monkeypatch.setattr(
         full_training_module,
         "build_fixed_palette_resnet18",
-        lambda **_kwargs: _tiny_classifier(nn_module),
+        lambda **_kwargs: tiny_classifier(nn_module),
     )
 
     args = full_training_module.parse_args(

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,6 +15,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from experiments.title_color_recommendation.plot_utils import (
+    load_pyplot,
+    markdown_image_path,
+    top_color_rows,
+)
 from src.models.fixed_palette_classifier import build_fixed_palette_resnet18
 from src.title_color_recommendation.data.dataloader import (
     create_title_color_dataloaders,
@@ -180,19 +184,6 @@ def resolve_project_path(path: str | Path) -> Path:
 def reset_jsonl_log(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("", encoding="utf-8")
-
-
-def _load_pyplot() -> Any:
-    matplotlib_config_dir = PROJECT_ROOT / "outputs" / ".matplotlib"
-    matplotlib_config_dir.mkdir(parents=True, exist_ok=True)
-    os.environ.setdefault("MPLCONFIGDIR", str(matplotlib_config_dir))
-
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    return plt
 
 
 def _scheduler_step(
@@ -374,18 +365,6 @@ def evaluate_best_model(
     )
 
 
-def top_color_rows(distribution: list[float], *, limit: int = 8) -> list[str]:
-    pairs = sorted(
-        enumerate(distribution),
-        key=lambda item: item[1],
-        reverse=True,
-    )
-    rows = ["| rank | palette_id | share |", "| ---: | ---: | ---: |"]
-    for rank, (palette_id, share) in enumerate(pairs[:limit], start=1):
-        rows.append(f"| {rank} | {palette_id} | {share:.4f} |")
-    return rows
-
-
 def _history_record_for_epoch(
     history: list[dict[str, Any]],
     *,
@@ -407,7 +386,7 @@ def write_training_plots(
     color_plot_path: Path,
 ) -> dict[str, Path]:
     _require_history(history)
-    plt = _load_pyplot()
+    plt = load_pyplot(PROJECT_ROOT)
 
     epochs = [int(record["epoch"]) for record in history]
     train_loss = [float(record[TRAIN_LOSS_KEY]) for record in history]
@@ -478,13 +457,6 @@ def write_training_plots(
         "ndcg": ndcg_plot_path,
         "color_distribution": color_plot_path,
     }
-
-
-def _markdown_image_path(report_path: Path, image_path: Path) -> str:
-    try:
-        return image_path.relative_to(report_path.parent).as_posix()
-    except ValueError:
-        return image_path.as_posix()
 
 
 def _not_collapsed(distribution: list[float], *, threshold: float) -> bool:
@@ -625,11 +597,11 @@ def write_full_training_report(
             "",
             "## Plots",
             "",
-            f"![Loss Curve]({_markdown_image_path(path, plot_paths['loss'])})",
-            f"![NDCG Curve]({_markdown_image_path(path, plot_paths['ndcg'])})",
+            f"![Loss Curve]({markdown_image_path(path, plot_paths['loss'])})",
+            f"![NDCG Curve]({markdown_image_path(path, plot_paths['ndcg'])})",
             (
                 "![Color Distribution]("
-                f"{_markdown_image_path(path, plot_paths['color_distribution'])})"
+                f"{markdown_image_path(path, plot_paths['color_distribution'])})"
             ),
             "",
             "## Test Top Colors",

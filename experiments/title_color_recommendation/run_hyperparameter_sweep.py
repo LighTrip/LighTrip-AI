@@ -4,7 +4,6 @@ import argparse
 import csv
 import json
 import logging
-import os
 import re
 import sys
 from dataclasses import dataclass
@@ -25,11 +24,14 @@ from experiments.title_color_recommendation.run_full_training import (
     VAL_NDCG_KEY,
     _color_distribution,
     _history_record_for_epoch,
-    _markdown_image_path,
     _metric_is_better,
     resolve_project_path,
     run_training_loop,
     validate_training_config,
+)
+from experiments.title_color_recommendation.plot_utils import (
+    load_pyplot,
+    markdown_image_path,
 )
 from src.models.fixed_palette_classifier import build_fixed_palette_resnet18
 from src.title_color_recommendation.data.dataloader import (
@@ -375,19 +377,6 @@ def write_results_csv(path: Path, results: list[SweepTrialResult]) -> None:
             )
 
 
-def _load_pyplot() -> Any:
-    matplotlib_config_dir = PROJECT_ROOT / "outputs" / ".matplotlib"
-    matplotlib_config_dir.mkdir(parents=True, exist_ok=True)
-    os.environ.setdefault("MPLCONFIGDIR", str(matplotlib_config_dir))
-
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    return plt
-
-
 def write_sweep_plots(
     results: list[SweepTrialResult],
     *,
@@ -397,7 +386,7 @@ def write_sweep_plots(
 ) -> dict[str, Path]:
     if not results:
         raise ValueError("results must not be empty")
-    plt = _load_pyplot()
+    plt = load_pyplot(PROJECT_ROOT)
     ordered_results = sorted_results(results)
     labels = [result.name for result in ordered_results]
     positions = list(range(len(ordered_results)))
@@ -534,9 +523,9 @@ def write_sweep_report(
         "",
         "## Plots",
         "",
-        f"![Validation Loss]({_markdown_image_path(path, plot_paths['val_loss'])})",
-        f"![Validation NDCG@5]({_markdown_image_path(path, plot_paths['ndcg'])})",
-        f"![Safety]({_markdown_image_path(path, plot_paths['safety'])})",
+        f"![Validation Loss]({markdown_image_path(path, plot_paths['val_loss'])})",
+        f"![Validation NDCG@5]({markdown_image_path(path, plot_paths['ndcg'])})",
+        f"![Safety]({markdown_image_path(path, plot_paths['safety'])})",
         "",
         "## Trial Ranking",
         "",
