@@ -111,9 +111,27 @@ def load_pseudo_scores(
     num_classes: int = DEFAULT_NUM_CLASSES,
     score_column: str = "pseudo_score",
 ) -> dict[str, np.ndarray]:
+    pseudo_scores_by_id, _wcag_pass_by_id = load_soft_label_vectors(
+        labels_soft_path,
+        image_ids,
+        num_classes=num_classes,
+        score_column=score_column,
+        wcag_column=None,
+    )
+    return pseudo_scores_by_id
+
+
+def load_soft_label_vectors(
+    labels_soft_path: str | Path,
+    image_ids: Iterable[str],
+    *,
+    num_classes: int = DEFAULT_NUM_CLASSES,
+    score_column: str = "pseudo_score",
+    wcag_column: str | None = "wcag_pass",
+) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
     requested_ids = {str(image_id) for image_id in image_ids}
     if not requested_ids:
-        return {}
+        return {}, {}
 
     path = Path(labels_soft_path)
     if not path.exists():
@@ -123,12 +141,21 @@ def load_pseudo_scores(
         image_id: np.zeros(num_classes, dtype=np.float32)
         for image_id in requested_ids
     }
-    seen_palette_ids: dict[str, set[int]] = {image_id: set() for image_id in requested_ids}
+    wcag_pass_by_id = {
+        image_id: np.zeros(num_classes, dtype=np.float32)
+        for image_id in requested_ids
+    }
+    seen_palette_ids: dict[str, set[int]] = {
+        image_id: set()
+        for image_id in requested_ids
+    }
     completed_ids: set[str] = set()
 
     with path.open("r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         required_columns = {"id", "palette_id", score_column}
+        if wcag_column is not None:
+            required_columns.add(wcag_column)
         missing_columns = required_columns.difference(reader.fieldnames or [])
         if missing_columns:
             raise ValueError(
@@ -148,6 +175,8 @@ def load_pseudo_scores(
                 )
 
             scores_by_id[image_id][palette_id] = np.float32(row[score_column])
+            if wcag_column is not None:
+                wcag_pass_by_id[image_id][palette_id] = np.float32(row[wcag_column])
             seen_palette_ids[image_id].add(palette_id)
             if len(seen_palette_ids[image_id]) == num_classes:
                 completed_ids.add(image_id)
@@ -166,7 +195,7 @@ def load_pseudo_scores(
             f"{len(incomplete_ids)} images; sample={sample}"
         )
 
-    return scores_by_id
+    return scores_by_id, wcag_pass_by_id
 
 
 def _required_value(row: Mapping[str, Any], key: str) -> str:
@@ -218,6 +247,14 @@ def manifest_items_from_rows(
     return items
 
 
+def flattened_image_data(image: Image.Image) -> Any:
+    get_flattened_data = getattr(image, "get_flattened_data", None)
+    if callable(get_flattened_data):
+        return get_flattened_data()
+    get_legacy_data = getattr(image, "getdata")
+    return get_legacy_data()
+
+
 class TitleColorDataset(TorchDataset):
     """Load native-size title ROI RGB, text mask, and 32-way soft labels."""
 
@@ -233,6 +270,7 @@ class TitleColorDataset(TorchDataset):
         rows: list[Mapping[str, Any]] | None = None,
         labels_matrix: np.ndarray | None = None,
         pseudo_scores_by_id: Mapping[str, np.ndarray] | None = None,
+        wcag_pass_by_id: Mapping[str, np.ndarray] | None = None,
         image_size: tuple[int, int] = DEFAULT_IMAGE_SIZE,
         augment: bool | None = None,
         augmentation: TitleColorAugmentationConfig | None = None,
@@ -277,14 +315,25 @@ class TitleColorDataset(TorchDataset):
             if labels_soft_path is not None
             else self.data_root / "processed" / "labels" / "labels_soft.csv"
         )
-        self.pseudo_scores_by_id = (
-            dict(pseudo_scores_by_id)
-            if pseudo_scores_by_id is not None
-            else load_pseudo_scores(
+        if pseudo_scores_by_id is None or wcag_pass_by_id is None:
+            loaded_pseudo_scores, loaded_wcag_pass = load_soft_label_vectors(
                 labels_soft_path,
                 (item.image_id for item in self.items),
                 num_classes=self.num_classes,
             )
+            if pseudo_scores_by_id is None:
+                pseudo_scores_by_id = loaded_pseudo_scores
+            if wcag_pass_by_id is None:
+                wcag_pass_by_id = loaded_wcag_pass
+        self.pseudo_scores_by_id = (
+            dict(pseudo_scores_by_id)
+            if pseudo_scores_by_id is not None
+            else {}
+        )
+        self.wcag_pass_by_id = (
+            dict(wcag_pass_by_id)
+            if wcag_pass_by_id is not None
+            else {}
         )
         self._validate_label_assets()
 
@@ -304,14 +353,20 @@ class TitleColorDataset(TorchDataset):
 
         width, height = roi.size
         rgb_tensor = (
-            torch_module.tensor(list(roi.getdata()), dtype=torch_module.float32)
+            torch_module.tensor(
+                list(flattened_image_data(roi)),
+                dtype=torch_module.float32,
+            )
             .view(height, width, 3)
             .permute(2, 0, 1)
             .contiguous()
             / 255.0
         )
         mask_tensor = (
-            torch_module.tensor(list(mask.getdata()), dtype=torch_module.float32)
+            torch_module.tensor(
+                list(flattened_image_data(mask)),
+                dtype=torch_module.float32,
+            )
             .view(1, height, width)
             .gt(127.5)
             .float()
@@ -326,6 +381,10 @@ class TitleColorDataset(TorchDataset):
             self.pseudo_scores_by_id[item.image_id],
             dtype=np.float32,
         )
+        wcag_pass = np.asarray(
+            self.wcag_pass_by_id[item.image_id],
+            dtype=np.float32,
+        )
 
         return {
             "x": x,
@@ -337,12 +396,17 @@ class TitleColorDataset(TorchDataset):
                 target_distribution.tolist(),
                 dtype=torch_module.float32,
             ),
+            "wcag_pass": torch_module.tensor(
+                wcag_pass.tolist(),
+                dtype=torch_module.float32,
+            ),
             "image_id": item.image_id,
         }
 
     def _validate_label_assets(self) -> None:
         matrix_rows = int(self.labels_matrix.shape[0])
         missing_pseudo_scores: list[str] = []
+        missing_wcag_pass: list[str] = []
 
         for item in self.items:
             if not 0 <= item.label_matrix_index < matrix_rows:
@@ -360,11 +424,25 @@ class TitleColorDataset(TorchDataset):
                     f"pseudo_scores for {item.image_id} must have "
                     f"{self.num_classes} values: shape={np.shape(pseudo_scores)}"
                 )
+            wcag_pass = self.wcag_pass_by_id.get(item.image_id)
+            if wcag_pass is None:
+                missing_wcag_pass.append(item.image_id)
+                continue
+            if len(wcag_pass) != self.num_classes:
+                raise ValueError(
+                    f"wcag_pass for {item.image_id} must have "
+                    f"{self.num_classes} values: shape={np.shape(wcag_pass)}"
+                )
 
         if missing_pseudo_scores:
             raise ValueError(
                 "missing pseudo_scores for image ids: "
                 f"{missing_pseudo_scores[:5]}"
+            )
+        if missing_wcag_pass:
+            raise ValueError(
+                "missing wcag_pass for image ids: "
+                f"{missing_wcag_pass[:5]}"
             )
 
     def _load_image(self, path: Path, *, mode: str, image_id: str) -> Image.Image:

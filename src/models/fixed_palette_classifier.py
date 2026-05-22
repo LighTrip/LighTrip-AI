@@ -171,15 +171,15 @@ def model_summary(
         with torch.no_grad():
             example = torch.zeros((batch_size, *input_shape), device=model_device)
             output = model(example)
+        return {
+            "total_parameters": count_total_parameters(model),
+            "trainable_parameters": count_trainable_parameters(model),
+            "input_shape": tuple(example.shape),
+            "output_shape": tuple(output.shape),
+        }
     finally:
         if was_training:
             model.train()
-    return {
-        "total_parameters": count_total_parameters(model),
-        "trainable_parameters": count_trainable_parameters(model),
-        "input_shape": tuple(example.shape),
-        "output_shape": tuple(output.shape),
-    }
 
 
 def log_model_summary(
