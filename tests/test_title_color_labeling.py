@@ -6,8 +6,10 @@ from PIL import Image
 from src.title_color_recommendation.labeling.soft_labels import (
     PaletteColor,
     SoftLabelConfig,
+    compute_pseudo_score,
     compute_fail_penalty,
     compute_image_soft_labels,
+    soft_label_config_from_mapping,
     softmax,
 )
 
@@ -106,3 +108,45 @@ def test_softmax_temperature_controls_sharpness() -> None:
     assert np.isclose(float(cold.sum()), 1.0)
     assert np.isclose(float(warm.sum()), 1.0)
     assert float(cold.max()) > float(warm.max())
+
+
+def test_soft_label_config_accepts_top_level_fail_penalty_weight() -> None:
+    config = soft_label_config_from_mapping(
+        {
+            "labeling": {
+                "temperature": 0.15,
+                "fail_penalty": 0.35,
+                "weights": {
+                    "readability_score": 0.65,
+                    "aesthetic_prior": 0.15,
+                    "tone_match_score": 0.15,
+                    "simplicity_score": 0.05,
+                },
+            }
+        }
+    )
+
+    assert np.isclose(config.temperature, 0.15)
+    assert np.isclose(config.fail_penalty_weight, 0.35)
+
+
+def test_compute_pseudo_score_uses_configured_component_weights() -> None:
+    config = SoftLabelConfig(
+        readability_weight=0.65,
+        aesthetic_weight=0.15,
+        tone_match_weight=0.15,
+        simplicity_weight=0.05,
+        fail_penalty_weight=0.35,
+    )
+
+    pseudo_score = compute_pseudo_score(
+        readability_score=np.asarray([0.8], dtype=np.float32),
+        aesthetic_prior=np.asarray([0.6], dtype=np.float32),
+        tone_match_score=np.asarray([0.7], dtype=np.float32),
+        simplicity_score=np.asarray([0.5], dtype=np.float32),
+        fail_penalty=np.asarray([0.2], dtype=np.float32),
+        config=config,
+    )
+
+    expected = (0.65 * 0.8) + (0.15 * 0.6) + (0.15 * 0.7) + (0.05 * 0.5) - (0.35 * 0.2)
+    assert np.isclose(float(pseudo_score[0]), expected)
