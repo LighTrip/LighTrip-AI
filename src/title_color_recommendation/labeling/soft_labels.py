@@ -88,7 +88,9 @@ def soft_label_config_from_mapping(mapping: Mapping[str, Any]) -> SoftLabelConfi
         aesthetic_weight=float(weights.get("aesthetic_prior", 0.15)),
         tone_match_weight=float(weights.get("tone_match_score", 0.10)),
         simplicity_weight=float(weights.get("simplicity_score", 0.05)),
-        fail_penalty_weight=float(weights.get("fail_penalty", 0.30)),
+        fail_penalty_weight=float(
+            weights.get("fail_penalty", labeling.get("fail_penalty", 0.30))
+        ),
     )
 
 
@@ -218,6 +220,24 @@ def softmax(values: np.ndarray, *, temperature: float) -> np.ndarray:
     if total <= 0 or not math.isfinite(total):
         raise ValueError("softmax produced an invalid denominator")
     return (exp / total).astype(np.float32)
+
+
+def compute_pseudo_score(
+    *,
+    readability_score: np.ndarray,
+    aesthetic_prior: np.ndarray,
+    tone_match_score: np.ndarray,
+    simplicity_score: np.ndarray,
+    fail_penalty: np.ndarray,
+    config: SoftLabelConfig,
+) -> np.ndarray:
+    return (
+        (config.readability_weight * readability_score)
+        + (config.aesthetic_weight * aesthetic_prior)
+        + (config.tone_match_weight * tone_match_score)
+        + (config.simplicity_weight * simplicity_score)
+        - (config.fail_penalty_weight * fail_penalty)
+    ).astype(np.float32)
 
 
 def colorfulness_score(rgb: np.ndarray) -> float:
@@ -415,13 +435,14 @@ def compute_image_soft_labels(
     tone_match_score = compute_tone_match_scores(palette, background)
     simplicity_score = compute_simplicity_scores(palette, background)
     fail_penalty = compute_fail_penalty(contrast_p10, contrast_mean, config)
-    pseudo_score = (
-        (config.readability_weight * readability_score)
-        + (config.aesthetic_weight * aesthetic_prior)
-        + (config.tone_match_weight * tone_match_score)
-        + (config.simplicity_weight * simplicity_score)
-        - (config.fail_penalty_weight * fail_penalty)
-    ).astype(np.float32)
+    pseudo_score = compute_pseudo_score(
+        readability_score=readability_score,
+        aesthetic_prior=aesthetic_prior,
+        tone_match_score=tone_match_score,
+        simplicity_score=simplicity_score,
+        fail_penalty=fail_penalty,
+        config=config,
+    )
     target_distribution = softmax(
         pseudo_score,
         temperature=config.temperature if temperature is None else temperature,
