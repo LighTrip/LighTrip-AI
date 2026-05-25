@@ -21,6 +21,9 @@ from experiments.title_color_recommendation.plot_utils import (
     load_pyplot,
     markdown_image_path,
 )
+from experiments.title_color_recommendation.path_utils import (
+    resolve_project_path as resolve_inside_project,
+)
 from src.models.fixed_palette_classifier import (
     DEFAULT_INPUT_SHAPE,
     count_total_parameters,
@@ -91,28 +94,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--loss-plot-path", type=Path, default=DEFAULT_LOSS_PLOT)
     parser.add_argument("--ndcg-plot-path", type=Path, default=DEFAULT_NDCG_PLOT)
     return parser.parse_args(argv)
-
-
-def is_relative_to(path: Path, root: Path) -> bool:
-    return path == root or root in path.parents
-
-
-def resolve_project_path(
-    value: str | Path,
-    *,
-    must_exist: bool = False,
-    description: str = "path",
-) -> Path:
-    path = Path(value).expanduser()
-    if not path.is_absolute():
-        path = PROJECT_ROOT / path
-    resolved = path.resolve(strict=False)
-    project_root = PROJECT_ROOT.resolve()
-    if not is_relative_to(resolved, project_root):
-        raise ValueError(f"{description} must be inside project root: {value}")
-    if must_exist and not resolved.exists():
-        raise FileNotFoundError(f"{description} not found: {value}")
-    return resolved
 
 
 def load_config(path: Path) -> dict[str, Any]:
@@ -423,7 +404,7 @@ def write_report(
 def compare_models(
     args: argparse.Namespace,
 ) -> tuple[list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
-    config_path = resolve_project_path(args.config, must_exist=True)
+    config_path = resolve_inside_project(PROJECT_ROOT, args.config, must_exist=True)
     config = load_config(config_path)
     model_names = configured_models(config, args.models)
     device_name = args.device or str(nested_value(config, "training", "device", "cuda"))
@@ -518,11 +499,11 @@ def compare_models(
 
 def run(args: argparse.Namespace) -> list[dict[str, Any]]:
     rows, histories = compare_models(args)
-    results_csv = resolve_project_path(args.results_csv)
-    report_path = resolve_project_path(args.report_path)
-    latency_plot_path = resolve_project_path(args.latency_plot_path)
-    loss_plot_path = resolve_project_path(args.loss_plot_path)
-    ndcg_plot_path = resolve_project_path(args.ndcg_plot_path)
+    results_csv = resolve_inside_project(PROJECT_ROOT, args.results_csv)
+    report_path = resolve_inside_project(PROJECT_ROOT, args.report_path)
+    latency_plot_path = resolve_inside_project(PROJECT_ROOT, args.latency_plot_path)
+    loss_plot_path = resolve_inside_project(PROJECT_ROOT, args.loss_plot_path)
+    ndcg_plot_path = resolve_inside_project(PROJECT_ROOT, args.ndcg_plot_path)
     write_results_csv(results_csv, rows)
     write_latency_plot(latency_plot_path, rows)
     write_training_curve_plots(

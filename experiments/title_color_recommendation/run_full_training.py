@@ -18,6 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from experiments.title_color_recommendation.plot_utils import (
     load_pyplot,
     markdown_image_path,
+    save_configured_figure,
     top_color_rows,
 )
 from src.models.title_color_model_registry import build_title_color_model
@@ -57,6 +58,21 @@ VAL_NDCG_KEY = "val_ndcg@5"
 TOP1_WCAG_PASS_RATE_KEY = "top1_wcag_pass_rate"
 TOP5_ANY_WCAG_PASS_RATE_KEY = "top5_any_wcag_pass_rate"
 COLOR_DISTRIBUTION_KEY = "color_distribution"
+TRAINING_ARG_OVERRIDES = (
+    ("batch_size", "batch_size"),
+    ("epochs", "epochs"),
+    ("learning_rate", "learning_rate"),
+    ("weight_decay", "weight_decay"),
+    ("num_workers", "num_workers"),
+    ("device", "device"),
+    ("scheduler", "scheduler"),
+    ("best_metric", "best_metric"),
+    ("seed", "seed"),
+    ("model_name", "model_name"),
+    ("dropout", "dropout"),
+    ("weight_init", "weight_init"),
+    ("activation", "activation"),
+)
 
 
 @dataclass(frozen=True)
@@ -123,6 +139,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def collect_training_arg_overrides(
+    args: argparse.Namespace,
+    *,
+    allowed_arg_names: frozenset[str] | None = None,
+) -> dict[str, Any]:
+    overrides: dict[str, Any] = {}
+    for arg_name, config_name in TRAINING_ARG_OVERRIDES:
+        if allowed_arg_names is not None and arg_name not in allowed_arg_names:
+            continue
+        value = getattr(args, arg_name)
+        if value is not None:
+            overrides[config_name] = value
+    return overrides
+
+
 def build_training_config(args: argparse.Namespace) -> TrainingConfig:
     if args.config is None:
         defaults = TrainingConfig(
@@ -145,25 +176,7 @@ def build_training_config(args: argparse.Namespace) -> TrainingConfig:
     else:
         defaults = load_training_config(PROJECT_ROOT / args.config)
 
-    overrides: dict[str, Any] = {}
-    for arg_name, config_name in (
-        ("batch_size", "batch_size"),
-        ("epochs", "epochs"),
-        ("learning_rate", "learning_rate"),
-        ("weight_decay", "weight_decay"),
-        ("num_workers", "num_workers"),
-        ("device", "device"),
-        ("scheduler", "scheduler"),
-        ("best_metric", "best_metric"),
-        ("seed", "seed"),
-        ("model_name", "model_name"),
-        ("dropout", "dropout"),
-        ("weight_init", "weight_init"),
-        ("activation", "activation"),
-    ):
-        value = getattr(args, arg_name)
-        if value is not None:
-            overrides[config_name] = value
+    overrides = collect_training_arg_overrides(args)
 
     if args.checkpoint_dir is not None:
         overrides["checkpoint_dir"] = str(args.checkpoint_dir)
@@ -420,34 +433,34 @@ def write_training_plots(
     best_val_distribution = _color_distribution(best_record)
     test_distribution = list(test_metrics.color_distribution)
 
-    loss_plot_path.parent.mkdir(parents=True, exist_ok=True)
-    ndcg_plot_path.parent.mkdir(parents=True, exist_ok=True)
-    color_plot_path.parent.mkdir(parents=True, exist_ok=True)
-
     figure, axis = plt.subplots(figsize=(8, 4.5))
     axis.plot(epochs, train_loss, marker="o", label="train_loss")
     axis.plot(epochs, val_loss, marker="o", label="val_loss")
-    axis.set_title("Full Training Loss Curve")
-    axis.set_xlabel("epoch")
-    axis.set_ylabel("KL loss")
-    axis.grid(True, alpha=0.3)
-    axis.legend()
-    figure.tight_layout()
-    figure.savefig(loss_plot_path, dpi=160)
-    plt.close(figure)
+    save_configured_figure(
+        plt,
+        figure,
+        axis,
+        loss_plot_path,
+        title="Full Training Loss Curve",
+        xlabel="epoch",
+        ylabel="KL loss",
+        legend=True,
+    )
 
     figure, axis = plt.subplots(figsize=(8, 4.5))
     axis.plot(epochs, val_ndcg_at_3, marker="o", label="val_ndcg@3")
     axis.plot(epochs, val_ndcg_at_5, marker="o", label="val_ndcg@5")
-    axis.set_title("Validation NDCG Curves")
-    axis.set_xlabel("epoch")
-    axis.set_ylabel("NDCG")
-    axis.set_ylim(0.0, 1.05)
-    axis.grid(True, alpha=0.3)
-    axis.legend()
-    figure.tight_layout()
-    figure.savefig(ndcg_plot_path, dpi=160)
-    plt.close(figure)
+    save_configured_figure(
+        plt,
+        figure,
+        axis,
+        ndcg_plot_path,
+        title="Validation NDCG Curves",
+        xlabel="epoch",
+        ylabel="NDCG",
+        ylim=(0.0, 1.05),
+        legend=True,
+    )
 
     palette_ids = list(range(len(test_distribution)))
     left_positions = [palette_id - 0.2 for palette_id in palette_ids]
@@ -468,15 +481,18 @@ def write_training_plots(
         label="test",
         color="#0F766E",
     )
-    axis.set_title("Top-1 Color Distribution")
-    axis.set_xlabel("palette_id")
-    axis.set_ylabel("share")
-    axis.set_ylim(0.0, max_share * 1.15)
-    axis.grid(axis="y", alpha=0.3)
-    axis.legend()
-    figure.tight_layout()
-    figure.savefig(color_plot_path, dpi=160)
-    plt.close(figure)
+    save_configured_figure(
+        plt,
+        figure,
+        axis,
+        color_plot_path,
+        title="Top-1 Color Distribution",
+        xlabel="palette_id",
+        ylabel="share",
+        ylim=(0.0, max_share * 1.15),
+        grid_axis="y",
+        legend=True,
+    )
 
     return {
         "loss": loss_plot_path,

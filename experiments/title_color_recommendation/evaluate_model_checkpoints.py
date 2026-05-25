@@ -15,6 +15,9 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from experiments.title_color_recommendation.run_model_comparison import model_size_mb
+from experiments.title_color_recommendation.path_utils import (
+    resolve_project_path as resolve_inside_project,
+)
 from src.models.fixed_palette_classifier import (
     count_total_parameters,
     count_trainable_parameters,
@@ -125,28 +128,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def is_relative_to(path: Path, root: Path) -> bool:
-    return path == root or root in path.parents
-
-
-def resolve_project_path(
-    value: str | Path,
-    *,
-    must_exist: bool = False,
-    description: str = "path",
-) -> Path:
-    path = Path(value).expanduser()
-    if not path.is_absolute():
-        path = PROJECT_ROOT / path
-    resolved = path.resolve(strict=False)
-    project_root = PROJECT_ROOT.resolve()
-    if not is_relative_to(resolved, project_root):
-        raise ValueError(f"{description} must be inside project root: {value}")
-    if must_exist and not resolved.exists():
-        raise FileNotFoundError(f"{description} not found: {value}")
-    return resolved
-
-
 def parse_model_names(raw_models: str) -> list[str]:
     models = [
         normalize_model_name(name)
@@ -166,7 +147,12 @@ def checkpoint_path_for_model(model_name: str) -> Path:
         raise ValueError(
             f"no default checkpoint path for model={model_name!r}; known={known}"
         ) from exc
-    return resolve_project_path(relative_path, must_exist=True, description="checkpoint")
+    return resolve_inside_project(
+        PROJECT_ROOT,
+        relative_path,
+        must_exist=True,
+        description="checkpoint",
+    )
 
 
 def load_checkpoint(path: Path) -> Mapping[str, Any]:
@@ -507,7 +493,7 @@ def run(args: argparse.Namespace) -> list[EvaluatedModel]:
         dataset_kwargs=dataset_kwargs(args),
     )
     test_loader = loaders["test"]
-    latency_csv = resolve_project_path(args.latency_csv)
+    latency_csv = resolve_inside_project(PROJECT_ROOT, args.latency_csv)
     latency_rows = load_latency_rows(latency_csv)
     results: list[EvaluatedModel] = []
     for model_name in parse_model_names(args.models):
@@ -523,8 +509,16 @@ def run(args: argparse.Namespace) -> list[EvaluatedModel]:
             )
         )
 
-    results_csv = resolve_project_path(args.results_csv, description="results CSV")
-    report_path = resolve_project_path(args.report_path, description="report path")
+    results_csv = resolve_inside_project(
+        PROJECT_ROOT,
+        args.results_csv,
+        description="results CSV",
+    )
+    report_path = resolve_inside_project(
+        PROJECT_ROOT,
+        args.report_path,
+        description="report path",
+    )
     write_results_csv(results_csv, results)
     write_report(
         report_path,

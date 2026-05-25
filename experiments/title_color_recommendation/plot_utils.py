@@ -25,6 +25,36 @@ def markdown_image_path(report_path: Path, image_path: Path) -> str:
         return image_path.as_posix()
 
 
+def save_configured_figure(
+    plt: Any,
+    figure: Any,
+    axis: Any,
+    path: Path,
+    *,
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    ylim: tuple[float, float] | None = None,
+    grid_axis: str | None = None,
+    legend: bool = False,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    axis.set_title(title)
+    axis.set_xlabel(xlabel)
+    axis.set_ylabel(ylabel)
+    if ylim is not None:
+        axis.set_ylim(*ylim)
+    if grid_axis is None:
+        axis.grid(True, alpha=0.3)
+    else:
+        axis.grid(axis=grid_axis, alpha=0.3)
+    if legend:
+        axis.legend()
+    figure.tight_layout()
+    figure.savefig(path, dpi=160)
+    plt.close(figure)
+
+
 def top_color_rows(distribution: list[float], *, limit: int = 8) -> list[str]:
     pairs = sorted(
         enumerate(distribution),

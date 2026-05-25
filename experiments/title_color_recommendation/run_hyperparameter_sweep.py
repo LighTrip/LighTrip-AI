@@ -25,8 +25,10 @@ from experiments.title_color_recommendation.run_full_training import (
     VAL_LOSS_KEY,
     VAL_NDCG_KEY,
     _color_distribution,
+    _dataset_kwargs,
     _history_record_for_epoch,
     _metric_is_better,
+    collect_training_arg_overrides,
     resolve_project_path,
     run_training_loop,
     validate_training_config,
@@ -56,6 +58,19 @@ DEFAULT_RESULTS_CSV_PATH = Path("outputs/reports/hyperparameter_sweep_results.cs
 DEFAULT_VAL_LOSS_PLOT_PATH = Path("outputs/reports/hparam_sweep_val_loss.png")
 DEFAULT_NDCG_PLOT_PATH = Path("outputs/reports/hparam_sweep_ndcg5.png")
 DEFAULT_SAFETY_PLOT_PATH = Path("outputs/reports/hparam_sweep_safety.png")
+SWEEP_ARG_OVERRIDE_NAMES = frozenset(
+    {
+        "epochs",
+        "batch_size",
+        "num_workers",
+        "device",
+        "seed",
+        "model_name",
+        "dropout",
+        "weight_init",
+        "activation",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -188,20 +203,12 @@ def build_sweep_trials(
         raw_name = str(values.pop("name", f"trial_{index:02d}"))
         trial_name = _sanitize_trial_name(raw_name)
 
-        for arg_name, config_name in (
-            ("epochs", "epochs"),
-            ("batch_size", "batch_size"),
-            ("num_workers", "num_workers"),
-            ("device", "device"),
-            ("seed", "seed"),
-            ("model_name", "model_name"),
-            ("dropout", "dropout"),
-            ("weight_init", "weight_init"),
-            ("activation", "activation"),
-        ):
-            value = getattr(args, arg_name)
-            if value is not None:
-                values[config_name] = value
+        values.update(
+            collect_training_arg_overrides(
+                args,
+                allowed_arg_names=SWEEP_ARG_OVERRIDE_NAMES,
+            )
+        )
 
         values["best_metric"] = args.selection_metric
         trial_dir = resolve_project_path(args.output_dir) / trial_name
@@ -213,15 +220,6 @@ def build_sweep_trials(
         trials.append(SweepTrial(name=trial_name, config=config))
 
     return trials
-
-
-def _dataset_kwargs(args: argparse.Namespace) -> dict[str, Any]:
-    dataset_kwargs: dict[str, Any] = {}
-    if args.labels_matrix is not None:
-        dataset_kwargs["labels_matrix_path"] = args.labels_matrix
-    if args.labels_soft is not None:
-        dataset_kwargs["labels_soft_path"] = args.labels_soft
-    return dataset_kwargs
 
 
 def create_sweep_datasets(args: argparse.Namespace) -> dict[str, Any]:
