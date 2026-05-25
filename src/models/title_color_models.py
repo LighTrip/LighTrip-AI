@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -1001,6 +1002,20 @@ class TitleHybridTransformer(nn.Module):
         return self.head(torch.cat((transformer_features, mask_features), dim=1))
 
 
+@dataclass(frozen=True)
+class MaskAwareTinyHybridRankerConfig:
+    stem_dim: int = 32
+    embed_dim: int = 96
+    depth: int = 4
+    num_heads: int = 4
+    mlp_dim: int = 192
+    image_dim: int = 96
+    stat_dim: int = 48
+    candidate_dim: int = 48
+    hidden_dim: int = 96
+    patch_size: tuple[int, int] = (12, 16)
+
+
 class MaskAwareTinyHybridColorRanker(nn.Module):
     stat_feature_dim = 39
     candidate_contrast_dim = 6
@@ -1011,20 +1026,22 @@ class MaskAwareTinyHybridColorRanker(nn.Module):
         num_classes: int = DEFAULT_NUM_CLASSES,
         input_shape: tuple[int, int, int] = DEFAULT_INPUT_SHAPE,
         palette_features: Tensor | None = None,
-        stem_dim: int = 32,
-        embed_dim: int = 96,
-        depth: int = 4,
-        num_heads: int = 4,
-        mlp_dim: int = 192,
-        image_dim: int = 96,
-        stat_dim: int = 48,
-        candidate_dim: int = 48,
-        hidden_dim: int = 96,
-        patch_size: tuple[int, int] = (12, 16),
+        architecture: MaskAwareTinyHybridRankerConfig | None = None,
         dropout: float = 0.2,
         activation: str = DEFAULT_ACTIVATION,
     ) -> None:
         super().__init__()
+        config = architecture or MaskAwareTinyHybridRankerConfig()
+        stem_dim = config.stem_dim
+        embed_dim = config.embed_dim
+        depth = config.depth
+        num_heads = config.num_heads
+        mlp_dim = config.mlp_dim
+        image_dim = config.image_dim
+        stat_dim = config.stat_dim
+        candidate_dim = config.candidate_dim
+        hidden_dim = config.hidden_dim
+        patch_size = config.patch_size
         features = (
             empty_palette_features(num_classes)
             if palette_features is None

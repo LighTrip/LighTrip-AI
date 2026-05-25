@@ -41,6 +41,10 @@ DEFAULT_REPORT_PATH = Path("outputs/reports/model_comparison_report.md")
 DEFAULT_LATENCY_PLOT = Path("outputs/reports/model_comparison_latency.png")
 DEFAULT_LOSS_PLOT = Path("outputs/reports/model_comparison_loss_curve.png")
 DEFAULT_NDCG_PLOT = Path("outputs/reports/model_comparison_ndcg5_curve.png")
+VAL_NDCG_AT_3_KEY = "val_ndcg@3"
+VAL_NDCG_AT_5_KEY = "val_ndcg@5"
+TEST_NDCG_AT_3_KEY = "test_ndcg@3"
+TEST_NDCG_AT_5_KEY = "test_ndcg@5"
 RESULT_FIELDS = [
     "model_name",
     "dropout",
@@ -56,8 +60,8 @@ RESULT_FIELDS = [
     "trained",
     "best_epoch",
     "test_loss",
-    "test_ndcg@3",
-    "test_ndcg@5",
+    TEST_NDCG_AT_3_KEY,
+    TEST_NDCG_AT_5_KEY,
     "top1_wcag_pass_rate",
     "top5_any_wcag_pass_rate",
     "max_color_share",
@@ -268,8 +272,8 @@ def row_from_training_result(
             "trained": True,
             "best_epoch": result.best_epoch,
             "test_loss": metrics["val_loss"],
-            "test_ndcg@3": metrics["val_ndcg@3"],
-            "test_ndcg@5": metrics["val_ndcg@5"],
+            TEST_NDCG_AT_3_KEY: metrics[VAL_NDCG_AT_3_KEY],
+            TEST_NDCG_AT_5_KEY: metrics[VAL_NDCG_AT_5_KEY],
             "top1_wcag_pass_rate": metrics["top1_wcag_pass_rate"],
             "top5_any_wcag_pass_rate": metrics["top5_any_wcag_pass_rate"],
             "max_color_share": max(distribution),
@@ -334,11 +338,11 @@ def write_training_curve_plots(
     figure, axis = plt.subplots(figsize=(9, 5))
     for model_name, history in histories.items():
         epochs = [int(record["epoch"]) for record in history]
-        values = [float(record["val_ndcg@5"]) for record in history]
+        values = [float(record[VAL_NDCG_AT_5_KEY]) for record in history]
         axis.plot(epochs, values, marker="o", label=model_name)
     axis.set_title("Validation NDCG@5 by Model")
     axis.set_xlabel("epoch")
-    axis.set_ylabel("val_ndcg@5")
+    axis.set_ylabel(VAL_NDCG_AT_5_KEY)
     axis.grid(True, alpha=0.3)
     axis.legend()
     figure.tight_layout()
@@ -372,7 +376,8 @@ def write_report(
         "",
         (
             "| model | init | act | dropout | params | size_mb | latency_ms | img_per_sec | "
-            "test_ndcg@3 | test_ndcg@5 | top1_wcag | top5_any_wcag | "
+            f"{TEST_NDCG_AT_3_KEY} | {TEST_NDCG_AT_5_KEY} | "
+            "top1_wcag | top5_any_wcag | "
             "max_color_share |"
         ),
         (
@@ -389,8 +394,8 @@ def write_report(
             f"{float(row['model_size_mb']):.3f} | "
             f"{float(row['inference_time_ms']):.3f} | "
             f"{float(row['images_per_second']):.2f} | "
-            f"{format_optional_float(row.get('test_ndcg@3'))} | "
-            f"{format_optional_float(row.get('test_ndcg@5'))} | "
+            f"{format_optional_float(row.get(TEST_NDCG_AT_3_KEY))} | "
+            f"{format_optional_float(row.get(TEST_NDCG_AT_5_KEY))} | "
             f"{format_optional_float(row.get('top1_wcag_pass_rate'))} | "
             f"{format_optional_float(row.get('top5_any_wcag_pass_rate'))} | "
             f"{format_optional_float(row.get('max_color_share'))} |"
@@ -486,8 +491,8 @@ def compare_models(
             "trained": False,
             "best_epoch": "",
             "test_loss": "",
-            "test_ndcg@3": "",
-            "test_ndcg@5": "",
+            TEST_NDCG_AT_3_KEY: "",
+            TEST_NDCG_AT_5_KEY: "",
             "top1_wcag_pass_rate": "",
             "top5_any_wcag_pass_rate": "",
             "max_color_share": "",

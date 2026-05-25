@@ -24,6 +24,8 @@ WEIGHT_INIT_STRATEGIES = (
     "xavier_uniform",
     "small_head",
 )
+NORMALIZATION_MODULE_TYPES = (nn.BatchNorm1d, nn.BatchNorm2d, nn.LayerNorm)
+WEIGHTED_MODULE_TYPES = (nn.Conv2d, nn.Linear)
 
 
 def available_weight_initializers() -> list[str]:
@@ -67,6 +69,34 @@ def _linear_modules(model: nn.Module) -> list[nn.Linear]:
     return [module for module in model.modules() if isinstance(module, nn.Linear)]
 
 
+def _small_head_hidden_strategy(module: nn.Module) -> str:
+    return "kaiming_normal" if isinstance(module, nn.Conv2d) else "xavier_uniform"
+
+
+def _init_small_head_module(
+    module: nn.Module,
+    *,
+    final_linear_ids: set[int],
+) -> None:
+    if id(module) in final_linear_ids:
+        nn.init.normal_(module.weight, mean=0.0, std=0.01)
+        return
+    _init_weight(module, _small_head_hidden_strategy(module))
+
+
+def _init_weighted_module(
+    module: nn.Module,
+    *,
+    strategy: str,
+    final_linear_ids: set[int],
+) -> None:
+    if strategy == "small_head":
+        _init_small_head_module(module, final_linear_ids=final_linear_ids)
+    else:
+        _init_weight(module, strategy)
+    _zero_bias(module)
+
+
 def _init_normalization(module: nn.Module) -> None:
     weight = getattr(module, "weight", None)
     if weight is not None:
@@ -85,19 +115,13 @@ def apply_weight_initialization(
     linears = _linear_modules(model)
     final_linear_ids = {id(linears[-1])} if linears else set()
     for module in model.modules():
-        if isinstance(module, (nn.BatchNorm1d, nn.BatchNorm2d, nn.LayerNorm)):
+        if isinstance(module, NORMALIZATION_MODULE_TYPES):
             _init_normalization(module)
-        elif isinstance(module, (nn.Conv2d, nn.Linear)):
-            if normalized == "small_head" and id(module) in final_linear_ids:
-                nn.init.normal_(module.weight, mean=0.0, std=0.01)
-            elif normalized == "small_head":
-                hidden_strategy = (
-                    "kaiming_normal"
-                    if isinstance(module, nn.Conv2d)
-                    else "xavier_uniform"
-                )
-                _init_weight(module, hidden_strategy)
-            else:
-                _init_weight(module, normalized)
-            _zero_bias(module)
+            continue
+        if isinstance(module, WEIGHTED_MODULE_TYPES):
+            _init_weighted_module(
+                module,
+                strategy=normalized,
+                final_linear_ids=final_linear_ids,
+            )
     return model
