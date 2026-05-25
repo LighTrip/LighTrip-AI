@@ -1,0 +1,44 @@
+models:
+  - resnet18
+  - resnet34
+  - efficientnet_b0
+  - convnext_tiny
+  - vit_tiny
+  - title_hybrid_tiny
+  - title_hybrid_fast
+  - swin_tiny
+  - flatten_mlp
+  - simple_cnn
+  - simple_cnn_m
+  - simple_cnn_m_res
+  - simple_cnn_m_res_mask_pool
+  - titlenet
+  - titlenet_fast_a
+  - titlenet_fast_b
+  - titlenet_fast_c
+  - simple_cnn_m_res_deeper
+  - simple_cnn_m_mask_pool
+  - simple_cnn_l
+  - mask_aware_cnn
+  - mask_aware_cnn_m
+  - mask_aware_palette_net
+  - mask_aware_tiny_hybrid_ranker
+
+training:
+  soft_label: v1
+  batch_size: 64
+  epochs: 20
+  learning_rate: 0.0005
+  weight_decay: 0.0001
+  dropout: 0.2
+  weight_init: pytorch_default
+  activation: silu
+  scheduler: cosine
+  num_workers: 4
+  device: cuda
+  pretrained: false
+
+latency:
+  batch_size: 64
+  warmup_steps: 5
+  benchmark_steps: 20

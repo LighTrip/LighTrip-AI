@@ -11,7 +11,9 @@ from src.title_color_recommendation.training.metrics import (
     color_distribution,
     mean_ndcg_at_k,
     ndcg_at_k,
+    top5_any_wcag_pass_rate,
     top1_wcag_pass_rate,
+    topk_any_wcag_pass_rate,
 )
 from src.title_color_recommendation.training.trainer import (
     append_jsonl_log,
@@ -36,7 +38,9 @@ __all__ = [
     "ndcg_at_k",
     "save_checkpoint",
     "soft_label_kl_divergence",
+    "top5_any_wcag_pass_rate",
     "top1_wcag_pass_rate",
+    "topk_any_wcag_pass_rate",
     "train_one_epoch",
     "training_config_from_mapping",
     "validate",

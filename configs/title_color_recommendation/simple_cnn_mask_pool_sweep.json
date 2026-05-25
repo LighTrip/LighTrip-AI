@@ -1,0 +1,38 @@
+{
+  "description": "Validation NDCG sweep for SimpleCNN-M with explicit mask-aware pooling.",
+  "base": {
+    "batch_size": 64,
+    "epochs": 20,
+    "learning_rate": 0.0005,
+    "weight_decay": 0.0005,
+    "num_classes": 32,
+    "num_workers": 4,
+    "device": "cuda",
+    "scheduler": "cosine",
+    "best_metric": "val_ndcg@5",
+    "seed": 42,
+    "model_name": "simple_cnn_m_mask_pool",
+    "dropout": 0.3,
+    "weight_init": "small_head",
+    "activation": "gelu"
+  },
+  "trials": [
+    {
+      "name": "simple_cnn_m_mask_pool_gelu",
+      "activation": "gelu"
+    },
+    {
+      "name": "simple_cnn_m_mask_pool_silu",
+      "activation": "silu"
+    },
+    {
+      "name": "simple_cnn_m_mask_pool_hardswish",
+      "activation": "hardswish"
+    },
+    {
+      "name": "simple_cnn_m_mask_pool_gelu_lr3e-4",
+      "activation": "gelu",
+      "learning_rate": 0.0003
+    }
+  ]
+}

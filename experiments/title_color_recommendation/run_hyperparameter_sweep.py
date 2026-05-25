@@ -19,12 +19,16 @@ if str(PROJECT_ROOT) not in sys.path:
 from experiments.title_color_recommendation.run_full_training import (
     COLOR_DISTRIBUTION_KEY,
     TOP1_WCAG_PASS_RATE_KEY,
+    TOP5_ANY_WCAG_PASS_RATE_KEY,
     TRAIN_LOSS_KEY,
+    VAL_NDCG_AT_3_KEY,
     VAL_LOSS_KEY,
     VAL_NDCG_KEY,
     _color_distribution,
+    _dataset_kwargs,
     _history_record_for_epoch,
     _metric_is_better,
+    collect_training_arg_overrides,
     resolve_project_path,
     run_training_loop,
     validate_training_config,
@@ -33,7 +37,7 @@ from experiments.title_color_recommendation.plot_utils import (
     load_pyplot,
     markdown_image_path,
 )
-from src.models.fixed_palette_classifier import build_fixed_palette_resnet18
+from src.models.title_color_model_registry import build_title_color_model
 from src.title_color_recommendation.data.dataloader import (
     create_title_color_datasets,
     require_dataloader,
@@ -54,6 +58,19 @@ DEFAULT_RESULTS_CSV_PATH = Path("outputs/reports/hyperparameter_sweep_results.cs
 DEFAULT_VAL_LOSS_PLOT_PATH = Path("outputs/reports/hparam_sweep_val_loss.png")
 DEFAULT_NDCG_PLOT_PATH = Path("outputs/reports/hparam_sweep_ndcg5.png")
 DEFAULT_SAFETY_PLOT_PATH = Path("outputs/reports/hparam_sweep_safety.png")
+SWEEP_ARG_OVERRIDE_NAMES = frozenset(
+    {
+        "epochs",
+        "batch_size",
+        "num_workers",
+        "device",
+        "seed",
+        "model_name",
+        "dropout",
+        "weight_init",
+        "activation",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -70,8 +87,10 @@ class SweepTrialResult:
     selection_metric: str
     selection_metric_value: float
     best_val_loss: float
+    best_val_ndcg_at_3: float
     best_val_ndcg_at_5: float
     best_top1_wcag_pass_rate: float
+    best_top5_any_wcag_pass_rate: float
     best_max_color_share: float
     final_train_loss: float
     final_val_loss: float
@@ -131,6 +150,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--num-workers", type=int, default=None)
     parser.add_argument("--device", default=None)
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--model-name", default=None)
+    parser.add_argument("--dropout", type=float, default=None)
+    parser.add_argument("--weight-init", default=None)
+    parser.add_argument("--activation", default=None)
     return parser.parse_args(argv)
 
 
@@ -180,16 +203,12 @@ def build_sweep_trials(
         raw_name = str(values.pop("name", f"trial_{index:02d}"))
         trial_name = _sanitize_trial_name(raw_name)
 
-        for arg_name, config_name in (
-            ("epochs", "epochs"),
-            ("batch_size", "batch_size"),
-            ("num_workers", "num_workers"),
-            ("device", "device"),
-            ("seed", "seed"),
-        ):
-            value = getattr(args, arg_name)
-            if value is not None:
-                values[config_name] = value
+        values.update(
+            collect_training_arg_overrides(
+                args,
+                allowed_arg_names=SWEEP_ARG_OVERRIDE_NAMES,
+            )
+        )
 
         values["best_metric"] = args.selection_metric
         trial_dir = resolve_project_path(args.output_dir) / trial_name
@@ -201,15 +220,6 @@ def build_sweep_trials(
         trials.append(SweepTrial(name=trial_name, config=config))
 
     return trials
-
-
-def _dataset_kwargs(args: argparse.Namespace) -> dict[str, Any]:
-    dataset_kwargs: dict[str, Any] = {}
-    if args.labels_matrix is not None:
-        dataset_kwargs["labels_matrix_path"] = args.labels_matrix
-    if args.labels_soft is not None:
-        dataset_kwargs["labels_soft_path"] = args.labels_soft
-    return dataset_kwargs
 
 
 def create_sweep_datasets(args: argparse.Namespace) -> dict[str, Any]:
@@ -265,8 +275,12 @@ def _trial_result_from_history(
         selection_metric=trial.config.best_metric,
         selection_metric_value=selection_metric_value,
         best_val_loss=float(best_record[VAL_LOSS_KEY]),
+        best_val_ndcg_at_3=float(best_record[VAL_NDCG_AT_3_KEY]),
         best_val_ndcg_at_5=float(best_record[VAL_NDCG_KEY]),
         best_top1_wcag_pass_rate=float(best_record[TOP1_WCAG_PASS_RATE_KEY]),
+        best_top5_any_wcag_pass_rate=float(
+            best_record[TOP5_ANY_WCAG_PASS_RATE_KEY]
+        ),
         best_max_color_share=max(best_distribution),
         final_train_loss=float(final_record[TRAIN_LOSS_KEY]),
         final_val_loss=float(final_record[VAL_LOSS_KEY]),
@@ -283,9 +297,13 @@ def run_trial(
 ) -> SweepTrialResult:
     LOGGER.info("starting trial=%s", trial.name)
     loaders = create_trial_loaders(datasets, trial.config)
-    model = build_fixed_palette_resnet18(
+    model = build_title_color_model(
+        trial.config.model_name,
         num_classes=trial.config.num_classes,
         pretrained=pretrained,
+        dropout=trial.config.dropout,
+        weight_init=trial.config.weight_init,
+        activation=trial.config.activation,
     )
     history, best_epoch, selection_metric_value, _best_state = run_training_loop(
         model,
@@ -338,11 +356,17 @@ def write_results_csv(path: Path, results: list[SweepTrialResult]) -> None:
         "selection_metric",
         "selection_metric_value",
         "best_val_loss",
+        "best_val_ndcg@3",
         "best_val_ndcg@5",
         "best_top1_wcag_pass_rate",
+        "best_top5_any_wcag_pass_rate",
         "best_max_color_share",
         "final_train_loss",
         "final_val_loss",
+        "model_name",
+        "dropout",
+        "weight_init",
+        "activation",
         "learning_rate",
         "weight_decay",
         "batch_size",
@@ -362,11 +386,19 @@ def write_results_csv(path: Path, results: list[SweepTrialResult]) -> None:
                     "selection_metric": result.selection_metric,
                     "selection_metric_value": result.selection_metric_value,
                     "best_val_loss": result.best_val_loss,
+                    "best_val_ndcg@3": result.best_val_ndcg_at_3,
                     "best_val_ndcg@5": result.best_val_ndcg_at_5,
                     "best_top1_wcag_pass_rate": result.best_top1_wcag_pass_rate,
+                    "best_top5_any_wcag_pass_rate": (
+                        result.best_top5_any_wcag_pass_rate
+                    ),
                     "best_max_color_share": result.best_max_color_share,
                     "final_train_loss": result.final_train_loss,
                     "final_val_loss": result.final_val_loss,
+                    "model_name": result.config.model_name,
+                    "dropout": result.config.dropout,
+                    "weight_init": result.config.weight_init,
+                    "activation": result.config.activation,
                     "learning_rate": result.config.learning_rate,
                     "weight_decay": result.config.weight_decay,
                     "batch_size": result.config.batch_size,
@@ -423,15 +455,23 @@ def write_sweep_plots(
     plt.close(figure)
 
     figure, axis = plt.subplots(figsize=(10, 4.8))
-    width = 0.4
-    left_positions = [position - width / 2 for position in positions]
-    right_positions = [position + width / 2 for position in positions]
+    width = 0.25
+    left_positions = [position - width for position in positions]
+    center_positions = positions
+    right_positions = [position + width for position in positions]
     axis.bar(
         left_positions,
         [result.best_top1_wcag_pass_rate for result in ordered_results],
         width=width,
         label="top1_wcag_pass_rate",
         color="#0F766E",
+    )
+    axis.bar(
+        center_positions,
+        [result.best_top5_any_wcag_pass_rate for result in ordered_results],
+        width=width,
+        label="top5_any_wcag_pass_rate",
+        color="#7C3AED",
     )
     axis.bar(
         right_positions,
@@ -467,13 +507,18 @@ def _format_config_command(
     lines = [
         "python experiments/title_color_recommendation/run_full_training.py \\",
         "  --config configs/title_color_recommendation/full_training.yaml \\",
+        f"  --model-name {config.model_name} \\",
         f"  --epochs {config.epochs} \\",
         f"  --learning-rate {config.learning_rate} \\",
         f"  --weight-decay {config.weight_decay} \\",
         f"  --batch-size {config.batch_size} \\",
+        f"  --dropout {config.dropout} \\",
+        f"  --weight-init {config.weight_init} \\",
+        f"  --activation {config.activation} \\",
         f"  --num-workers {config.num_workers} \\",
         f"  --device {config.device} \\",
         f"  --seed {config.seed} \\",
+        f"  --best-metric {config.best_metric} \\",
         f"  --scheduler {config.scheduler}",
     ]
     if pretrained:
@@ -510,12 +555,21 @@ def write_sweep_report(
         "| --- | ---: |",
         f"| best_epoch | {best_trial.best_epoch} |",
         f"| best_val_loss | {best_trial.best_val_loss:.6f} |",
+        f"| best_val_ndcg@3 | {best_trial.best_val_ndcg_at_3:.6f} |",
         f"| best_val_ndcg@5 | {best_trial.best_val_ndcg_at_5:.6f} |",
         (
             "| best_top1_wcag_pass_rate | "
             f"{best_trial.best_top1_wcag_pass_rate:.6f} |"
         ),
+        (
+            "| best_top5_any_wcag_pass_rate | "
+            f"{best_trial.best_top5_any_wcag_pass_rate:.6f} |"
+        ),
         f"| best_max_color_share | {best_trial.best_max_color_share:.6f} |",
+        f"| model_name | {best_trial.config.model_name} |",
+        f"| dropout | {best_trial.config.dropout} |",
+        f"| weight_init | {best_trial.config.weight_init} |",
+        f"| activation | {best_trial.config.activation} |",
         f"| learning_rate | {best_trial.config.learning_rate} |",
         f"| weight_decay | {best_trial.config.weight_decay} |",
         f"| batch_size | {best_trial.config.batch_size} |",
@@ -530,23 +584,33 @@ def write_sweep_report(
         "## Trial Ranking",
         "",
         (
-            "| rank | trial | lr | wd | batch | scheduler | best_epoch | "
-            "val_loss | val_ndcg@5 | top1_wcag | max_color_share |"
+            "| rank | trial | model | init | act | dropout | lr | wd | batch | "
+            "scheduler | best_epoch | val_loss | val_ndcg@3 | val_ndcg@5 | "
+            "top1_wcag | top5_any_wcag | max_color_share |"
         ),
-        "| ---: | --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: |",
+        (
+            "| ---: | --- | --- | --- | --- | ---: | ---: | ---: | ---: | "
+            "--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
+        ),
     ]
 
     for rank, result in enumerate(ordered_results, start=1):
         lines.append(
             f"| {rank} | {result.name} | "
+            f"{result.config.model_name} | "
+            f"{result.config.weight_init} | "
+            f"{result.config.activation} | "
+            f"{result.config.dropout} | "
             f"{result.config.learning_rate} | "
             f"{result.config.weight_decay} | "
             f"{result.config.batch_size} | "
             f"{result.config.scheduler} | "
             f"{result.best_epoch} | "
             f"{result.best_val_loss:.6f} | "
+            f"{result.best_val_ndcg_at_3:.6f} | "
             f"{result.best_val_ndcg_at_5:.6f} | "
             f"{result.best_top1_wcag_pass_rate:.6f} | "
+            f"{result.best_top5_any_wcag_pass_rate:.6f} | "
             f"{result.best_max_color_share:.6f} |"
         )
 

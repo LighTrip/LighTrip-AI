@@ -126,8 +126,10 @@ def validate(
 ) -> ValidationMetrics:
     model.eval()
     total_loss = 0.0
-    total_ndcg = 0.0
+    total_ndcg_at_3 = 0.0
+    total_ndcg_at_5 = 0.0
     total_wcag = 0.0
+    total_top5_any_wcag = 0.0
     sample_count = 0
     color_counts = torch.zeros(num_classes, dtype=torch.float64)
 
@@ -145,13 +147,19 @@ def validate(
             loss = soft_label_kl_divergence(logits, target_distribution)
             batch_size = int(x.shape[0])
 
-            ndcg = ndcg_at_k(logits, target_distribution, k=5)
+            ndcg_at_3 = ndcg_at_k(logits, target_distribution, k=3)
+            ndcg_at_5 = ndcg_at_k(logits, target_distribution, k=5)
             top1 = logits.argmax(dim=-1, keepdim=True)
             wcag_values = wcag_pass.gather(dim=-1, index=top1).float()
+            top5 = logits.topk(min(5, logits.shape[-1]), dim=-1).indices
+            top5_any_wcag = wcag_pass.gather(dim=-1, index=top5)
+            top5_any_wcag_values = top5_any_wcag.bool().any(dim=-1).float()
 
             total_loss += float(loss.item()) * batch_size
-            total_ndcg += float(ndcg.sum().item())
+            total_ndcg_at_3 += float(ndcg_at_3.sum().item())
+            total_ndcg_at_5 += float(ndcg_at_5.sum().item())
             total_wcag += float(wcag_values.sum().item())
+            total_top5_any_wcag += float(top5_any_wcag_values.sum().item())
             sample_count += batch_size
 
             batch_counts = torch.bincount(
@@ -168,8 +176,13 @@ def validate(
 
     return ValidationMetrics(
         val_loss=_weighted_average(total_loss, sample_count),
-        val_ndcg_at_5=_weighted_average(total_ndcg, sample_count),
+        val_ndcg_at_3=_weighted_average(total_ndcg_at_3, sample_count),
+        val_ndcg_at_5=_weighted_average(total_ndcg_at_5, sample_count),
         top1_wcag_pass_rate=_weighted_average(total_wcag, sample_count),
+        top5_any_wcag_pass_rate=_weighted_average(
+            total_top5_any_wcag,
+            sample_count,
+        ),
         color_distribution=distribution,
     )
 
@@ -332,13 +345,16 @@ def fit(
             )
 
         target_logger.info(
-            "epoch=%s train_loss=%.6f val_loss=%.6f val_ndcg@5=%.6f "
-            "top1_wcag_pass_rate=%.6f",
+            "epoch=%s train_loss=%.6f val_loss=%.6f val_ndcg@3=%.6f "
+            "val_ndcg@5=%.6f top1_wcag_pass_rate=%.6f "
+            "top5_any_wcag_pass_rate=%.6f",
             epoch,
             train_loss,
             validation.val_loss,
+            validation.val_ndcg_at_3,
             validation.val_ndcg_at_5,
             validation.top1_wcag_pass_rate,
+            validation.top5_any_wcag_pass_rate,
         )
 
     return history

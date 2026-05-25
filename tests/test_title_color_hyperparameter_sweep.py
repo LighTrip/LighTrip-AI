@@ -78,6 +78,14 @@ def test_build_sweep_trials_applies_overrides(
             "3",
             "--max-trials",
             "1",
+            "--model-name",
+            "simple_cnn",
+            "--dropout",
+            "0.3",
+            "--weight-init",
+            "small_head",
+            "--activation",
+            "hardswish",
         ]
     )
     spec = sweep_module.load_sweep_spec(args.sweep_config)
@@ -88,6 +96,10 @@ def test_build_sweep_trials_applies_overrides(
     assert trials[0].name == "lr_a"
     assert trials[0].config.epochs == 3
     assert trials[0].config.best_metric == "val_loss"
+    assert trials[0].config.model_name == "simple_cnn"
+    assert math.isclose(trials[0].config.dropout, 0.3, rel_tol=0.0, abs_tol=1e-12)
+    assert trials[0].config.weight_init == "small_head"
+    assert trials[0].config.activation == "hardswish"
 
 
 def test_pick_best_trial_prefers_lower_validation_loss(
@@ -108,8 +120,10 @@ def test_pick_best_trial_prefers_lower_validation_loss(
         selection_metric="val_loss",
         selection_metric_value=0.5,
         best_val_loss=0.5,
+        best_val_ndcg_at_3=0.7,
         best_val_ndcg_at_5=0.8,
         best_top1_wcag_pass_rate=0.5,
+        best_top5_any_wcag_pass_rate=0.9,
         best_max_color_share=0.4,
         final_train_loss=0.6,
         final_val_loss=0.5,
@@ -123,8 +137,10 @@ def test_pick_best_trial_prefers_lower_validation_loss(
         selection_metric="val_loss",
         selection_metric_value=0.3,
         best_val_loss=0.3,
+        best_val_ndcg_at_3=0.8,
         best_val_ndcg_at_5=0.9,
         best_top1_wcag_pass_rate=0.6,
+        best_top5_any_wcag_pass_rate=1.0,
         best_max_color_share=0.5,
         final_train_loss=0.4,
         final_val_loss=0.3,
@@ -159,8 +175,8 @@ def test_run_sweep_writes_ranking_report_and_artifacts(
     )
     monkeypatch.setattr(
         sweep_module,
-        "build_fixed_palette_resnet18",
-        lambda **_kwargs: tiny_classifier(nn_module),
+        "build_title_color_model",
+        lambda *_args, **_kwargs: tiny_classifier(nn_module),
     )
 
     args = sweep_module.parse_args(
@@ -194,8 +210,14 @@ def test_run_sweep_writes_ranking_report_and_artifacts(
     report = result.report_path.read_text(encoding="utf-8")
     assert "test_split_used: `False`" in report
     assert "## Trial Ranking" in report
+    assert "top5_any_wcag" in report
 
     with result.results_csv_path.open(newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     assert len(rows) == 2
     assert rows[0]["selection_metric"] == "val_loss"
+    assert "best_val_ndcg@3" in rows[0]
+    assert "best_top5_any_wcag_pass_rate" in rows[0]
+    assert rows[0]["model_name"] == "resnet18"
+    assert rows[0]["weight_init"] == "pytorch_default"
+    assert rows[0]["activation"] == "silu"

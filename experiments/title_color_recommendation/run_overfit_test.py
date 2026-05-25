@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import csv
 import logging
-import os
 import sys
 from pathlib import Path
 from typing import Any, Mapping
@@ -15,6 +14,15 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from experiments.title_color_recommendation.run_full_training import (
+    _color_distribution,
+    _require_history,
+)
+from experiments.title_color_recommendation.plot_utils import (
+    load_pyplot,
+    save_configured_figure,
+    top_color_rows,
+)
 from src.models.fixed_palette_classifier import build_fixed_palette_resnet18
 from src.title_color_recommendation.data.dataset import (
     TitleColorDataset,
@@ -37,6 +45,7 @@ TRAIN_LOSS_KEY = "train_loss"
 TRAIN_EVAL_LOSS_KEY = "train_eval_loss"
 TRAIN_NDCG_KEY = "train_ndcg@5"
 TOP1_WCAG_PASS_RATE_KEY = "top1_wcag_pass_rate"
+TOP5_ANY_WCAG_PASS_RATE_KEY = "top5_any_wcag_pass_rate"
 COLOR_DISTRIBUTION_KEY = "color_distribution"
 
 
@@ -183,36 +192,12 @@ def metric_record(
         TRAIN_EVAL_LOSS_KEY: train_metrics.val_loss,
         TRAIN_NDCG_KEY: train_metrics.val_ndcg_at_5,
         TOP1_WCAG_PASS_RATE_KEY: train_metrics.top1_wcag_pass_rate,
+        TOP5_ANY_WCAG_PASS_RATE_KEY: train_metrics.top5_any_wcag_pass_rate,
         COLOR_DISTRIBUTION_KEY: train_metrics.color_distribution,
     }
     if train_loss is not None:
         record[TRAIN_LOSS_KEY] = train_loss
     return record
-
-
-def top_color_rows(distribution: list[float], *, limit: int = 8) -> list[str]:
-    pairs = sorted(
-        enumerate(distribution),
-        key=lambda item: item[1],
-        reverse=True,
-    )
-    rows = ["| rank | palette_id | share |", "| ---: | ---: | ---: |"]
-    for rank, (palette_id, share) in enumerate(pairs[:limit], start=1):
-        rows.append(f"| {rank} | {palette_id} | {share:.4f} |")
-    return rows
-
-
-def _load_pyplot() -> Any:
-    matplotlib_config_dir = PROJECT_ROOT / "outputs" / ".matplotlib"
-    matplotlib_config_dir.mkdir(parents=True, exist_ok=True)
-    os.environ.setdefault("MPLCONFIGDIR", str(matplotlib_config_dir))
-
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    return plt
 
 
 def _record_value(
@@ -221,21 +206,6 @@ def _record_value(
 ) -> float | None:
     value = record.get(key)
     return None if value is None else float(value)
-
-
-def _require_history(history: list[dict[str, Any]]) -> None:
-    if not history:
-        raise ValueError("history must not be empty")
-
-
-def _color_distribution(record: Mapping[str, Any]) -> list[float]:
-    distribution = [
-        float(value)
-        for value in record[COLOR_DISTRIBUTION_KEY]
-    ]
-    if not distribution:
-        raise ValueError("color_distribution must not be empty")
-    return distribution
 
 
 def write_overfit_plots(
@@ -247,7 +217,7 @@ def write_overfit_plots(
 ) -> dict[str, Path]:
     _require_history(history)
 
-    plt = _load_pyplot()
+    plt = load_pyplot(PROJECT_ROOT)
 
     epochs = [int(record["epoch"]) for record in history]
     train_loss = [_record_value(record, TRAIN_LOSS_KEY) for record in history]
@@ -260,10 +230,6 @@ def write_overfit_plots(
         for record in history
     ]
     final_distribution = _color_distribution(history[-1])
-
-    loss_plot_path.parent.mkdir(parents=True, exist_ok=True)
-    ndcg_plot_path.parent.mkdir(parents=True, exist_ok=True)
-    color_plot_path.parent.mkdir(parents=True, exist_ok=True)
 
     figure, axis = plt.subplots(figsize=(8, 4.5))
     train_loss_epochs = [
@@ -289,37 +255,44 @@ def write_overfit_plots(
         marker="o",
         label="train_eval_loss",
     )
-    axis.set_title("Overfit Loss Curve")
-    axis.set_xlabel("epoch")
-    axis.set_ylabel("KL loss")
-    axis.grid(True, alpha=0.3)
-    axis.legend()
-    figure.tight_layout()
-    figure.savefig(loss_plot_path, dpi=160)
-    plt.close(figure)
+    save_configured_figure(
+        plt,
+        figure,
+        axis,
+        loss_plot_path,
+        title="Overfit Loss Curve",
+        xlabel="epoch",
+        ylabel="KL loss",
+        legend=True,
+    )
 
     figure, axis = plt.subplots(figsize=(8, 4.5))
     axis.plot(epochs, train_ndcg, marker="o", color="#2563EB")
-    axis.set_title("Overfit NDCG@5 Curve")
-    axis.set_xlabel("epoch")
-    axis.set_ylabel("train_ndcg@5")
-    axis.set_ylim(0.0, 1.05)
-    axis.grid(True, alpha=0.3)
-    figure.tight_layout()
-    figure.savefig(ndcg_plot_path, dpi=160)
-    plt.close(figure)
+    save_configured_figure(
+        plt,
+        figure,
+        axis,
+        ndcg_plot_path,
+        title="Overfit NDCG@5 Curve",
+        xlabel="epoch",
+        ylabel="train_ndcg@5",
+        ylim=(0.0, 1.05),
+    )
 
     figure, axis = plt.subplots(figsize=(9, 4.5))
     axis.bar(range(len(final_distribution)), final_distribution, color="#0F766E")
-    axis.set_title("Final Top-1 Color Distribution")
-    axis.set_xlabel("palette_id")
-    axis.set_ylabel("share")
     color_axis_limit = max(max(final_distribution) * 1.15, 0.01)
-    axis.set_ylim(0.0, color_axis_limit)
-    axis.grid(axis="y", alpha=0.3)
-    figure.tight_layout()
-    figure.savefig(color_plot_path, dpi=160)
-    plt.close(figure)
+    save_configured_figure(
+        plt,
+        figure,
+        axis,
+        color_plot_path,
+        title="Final Top-1 Color Distribution",
+        xlabel="palette_id",
+        ylabel="share",
+        ylim=(0.0, color_axis_limit),
+        grid_axis="y",
+    )
 
     return {
         "loss": loss_plot_path,
@@ -421,6 +394,11 @@ def write_report(
                 f"| top1_wcag_pass_rate | "
                 f"{float(initial[TOP1_WCAG_PASS_RATE_KEY]):.6f} | "
                 f"{float(final[TOP1_WCAG_PASS_RATE_KEY]):.6f} |"
+            ),
+            (
+                f"| top5_any_wcag_pass_rate | "
+                f"{float(initial[TOP5_ANY_WCAG_PASS_RATE_KEY]):.6f} | "
+                f"{float(final[TOP5_ANY_WCAG_PASS_RATE_KEY]):.6f} |"
             ),
             f"| max_color_share | - | {max_color_share:.6f} |",
             "",

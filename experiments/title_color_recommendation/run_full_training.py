@@ -18,9 +18,12 @@ if str(PROJECT_ROOT) not in sys.path:
 from experiments.title_color_recommendation.plot_utils import (
     load_pyplot,
     markdown_image_path,
+    save_configured_figure,
     top_color_rows,
 )
-from src.models.fixed_palette_classifier import build_fixed_palette_resnet18
+from src.models.title_color_model_registry import build_title_color_model
+from src.models.title_color_initialization import normalize_weight_init_name
+from src.models.title_color_models import normalize_activation_name
 from src.title_color_recommendation.data.dataloader import (
     create_title_color_dataloaders,
 )
@@ -50,9 +53,26 @@ DEFAULT_NDCG_PLOT_PATH = Path("outputs/reports/ndcg5_curve.png")
 DEFAULT_COLOR_PLOT_PATH = Path("outputs/reports/color_distribution.png")
 TRAIN_LOSS_KEY = "train_loss"
 VAL_LOSS_KEY = "val_loss"
+VAL_NDCG_AT_3_KEY = "val_ndcg@3"
 VAL_NDCG_KEY = "val_ndcg@5"
 TOP1_WCAG_PASS_RATE_KEY = "top1_wcag_pass_rate"
+TOP5_ANY_WCAG_PASS_RATE_KEY = "top5_any_wcag_pass_rate"
 COLOR_DISTRIBUTION_KEY = "color_distribution"
+TRAINING_ARG_OVERRIDES = (
+    ("batch_size", "batch_size"),
+    ("epochs", "epochs"),
+    ("learning_rate", "learning_rate"),
+    ("weight_decay", "weight_decay"),
+    ("num_workers", "num_workers"),
+    ("device", "device"),
+    ("scheduler", "scheduler"),
+    ("best_metric", "best_metric"),
+    ("seed", "seed"),
+    ("model_name", "model_name"),
+    ("dropout", "dropout"),
+    ("weight_init", "weight_init"),
+    ("activation", "activation"),
+)
 
 
 @dataclass(frozen=True)
@@ -92,6 +112,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--best-metric", default=None)
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--model-name", default=None)
+    parser.add_argument("--dropout", type=float, default=None)
+    parser.add_argument("--weight-init", default=None)
+    parser.add_argument("--activation", default=None)
     parser.add_argument("--pretrained", action="store_true")
     parser.add_argument("--collapse-threshold", type=float, default=0.8)
     parser.add_argument("--checkpoint-dir", type=Path, default=None)
@@ -115,6 +139,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def collect_training_arg_overrides(
+    args: argparse.Namespace,
+    *,
+    allowed_arg_names: frozenset[str] | None = None,
+) -> dict[str, Any]:
+    overrides: dict[str, Any] = {}
+    for arg_name, config_name in TRAINING_ARG_OVERRIDES:
+        if allowed_arg_names is not None and arg_name not in allowed_arg_names:
+            continue
+        value = getattr(args, arg_name)
+        if value is not None:
+            overrides[config_name] = value
+    return overrides
+
+
 def build_training_config(args: argparse.Namespace) -> TrainingConfig:
     if args.config is None:
         defaults = TrainingConfig(
@@ -129,25 +168,15 @@ def build_training_config(args: argparse.Namespace) -> TrainingConfig:
             log_path=str(DEFAULT_LOG_PATH),
             best_metric=VAL_LOSS_KEY,
             seed=42,
+            model_name="resnet18",
+            dropout=0.2,
+            weight_init="pytorch_default",
+            activation="silu",
         )
     else:
         defaults = load_training_config(PROJECT_ROOT / args.config)
 
-    overrides: dict[str, Any] = {}
-    for arg_name, config_name in (
-        ("batch_size", "batch_size"),
-        ("epochs", "epochs"),
-        ("learning_rate", "learning_rate"),
-        ("weight_decay", "weight_decay"),
-        ("num_workers", "num_workers"),
-        ("device", "device"),
-        ("scheduler", "scheduler"),
-        ("best_metric", "best_metric"),
-        ("seed", "seed"),
-    ):
-        value = getattr(args, arg_name)
-        if value is not None:
-            overrides[config_name] = value
+    overrides = collect_training_arg_overrides(args)
 
     if args.checkpoint_dir is not None:
         overrides["checkpoint_dir"] = str(args.checkpoint_dir)
@@ -172,6 +201,10 @@ def validate_training_config(config: TrainingConfig) -> None:
         raise ValueError(f"num_classes must be positive: {config.num_classes}")
     if config.num_workers < 0:
         raise ValueError(f"num_workers must be non-negative: {config.num_workers}")
+    if not 0.0 <= config.dropout < 1.0:
+        raise ValueError(f"dropout must be in [0, 1): {config.dropout}")
+    normalize_weight_init_name(config.weight_init)
+    normalize_activation_name(config.activation)
 
 
 def resolve_project_path(path: str | Path) -> Path:
@@ -334,13 +367,16 @@ def run_training_loop(
             )
 
         LOGGER.info(
-            "epoch=%s train_loss=%.6f val_loss=%.6f val_ndcg@5=%.6f "
-            "top1_wcag_pass_rate=%.6f",
+            "epoch=%s train_loss=%.6f val_loss=%.6f val_ndcg@3=%.6f "
+            "val_ndcg@5=%.6f top1_wcag_pass_rate=%.6f "
+            "top5_any_wcag_pass_rate=%.6f",
             epoch,
             train_loss,
             validation.val_loss,
+            validation.val_ndcg_at_3,
             validation.val_ndcg_at_5,
             validation.top1_wcag_pass_rate,
+            validation.top5_any_wcag_pass_rate,
         )
 
     if best_metric_value is None or best_model_state is None:
@@ -391,37 +427,40 @@ def write_training_plots(
     epochs = [int(record["epoch"]) for record in history]
     train_loss = [float(record[TRAIN_LOSS_KEY]) for record in history]
     val_loss = [float(record[VAL_LOSS_KEY]) for record in history]
-    val_ndcg = [float(record[VAL_NDCG_KEY]) for record in history]
+    val_ndcg_at_3 = [float(record[VAL_NDCG_AT_3_KEY]) for record in history]
+    val_ndcg_at_5 = [float(record[VAL_NDCG_KEY]) for record in history]
     best_record = _history_record_for_epoch(history, epoch=best_epoch)
     best_val_distribution = _color_distribution(best_record)
     test_distribution = list(test_metrics.color_distribution)
 
-    loss_plot_path.parent.mkdir(parents=True, exist_ok=True)
-    ndcg_plot_path.parent.mkdir(parents=True, exist_ok=True)
-    color_plot_path.parent.mkdir(parents=True, exist_ok=True)
-
     figure, axis = plt.subplots(figsize=(8, 4.5))
     axis.plot(epochs, train_loss, marker="o", label="train_loss")
     axis.plot(epochs, val_loss, marker="o", label="val_loss")
-    axis.set_title("Full Training Loss Curve")
-    axis.set_xlabel("epoch")
-    axis.set_ylabel("KL loss")
-    axis.grid(True, alpha=0.3)
-    axis.legend()
-    figure.tight_layout()
-    figure.savefig(loss_plot_path, dpi=160)
-    plt.close(figure)
+    save_configured_figure(
+        plt,
+        figure,
+        axis,
+        loss_plot_path,
+        title="Full Training Loss Curve",
+        xlabel="epoch",
+        ylabel="KL loss",
+        legend=True,
+    )
 
     figure, axis = plt.subplots(figsize=(8, 4.5))
-    axis.plot(epochs, val_ndcg, marker="o", color="#2563EB")
-    axis.set_title("Validation NDCG@5 Curve")
-    axis.set_xlabel("epoch")
-    axis.set_ylabel("val_ndcg@5")
-    axis.set_ylim(0.0, 1.05)
-    axis.grid(True, alpha=0.3)
-    figure.tight_layout()
-    figure.savefig(ndcg_plot_path, dpi=160)
-    plt.close(figure)
+    axis.plot(epochs, val_ndcg_at_3, marker="o", label="val_ndcg@3")
+    axis.plot(epochs, val_ndcg_at_5, marker="o", label="val_ndcg@5")
+    save_configured_figure(
+        plt,
+        figure,
+        axis,
+        ndcg_plot_path,
+        title="Validation NDCG Curves",
+        xlabel="epoch",
+        ylabel="NDCG",
+        ylim=(0.0, 1.05),
+        legend=True,
+    )
 
     palette_ids = list(range(len(test_distribution)))
     left_positions = [palette_id - 0.2 for palette_id in palette_ids]
@@ -442,15 +481,18 @@ def write_training_plots(
         label="test",
         color="#0F766E",
     )
-    axis.set_title("Top-1 Color Distribution")
-    axis.set_xlabel("palette_id")
-    axis.set_ylabel("share")
-    axis.set_ylim(0.0, max_share * 1.15)
-    axis.grid(axis="y", alpha=0.3)
-    axis.legend()
-    figure.tight_layout()
-    figure.savefig(color_plot_path, dpi=160)
-    plt.close(figure)
+    save_configured_figure(
+        plt,
+        figure,
+        axis,
+        color_plot_path,
+        title="Top-1 Color Distribution",
+        xlabel="palette_id",
+        ylabel="share",
+        ylim=(0.0, max_share * 1.15),
+        grid_axis="y",
+        legend=True,
+    )
 
     return {
         "loss": loss_plot_path,
@@ -478,7 +520,15 @@ def success_checks(
     return {
         "train_loss_recorded": all(TRAIN_LOSS_KEY in record for record in history),
         "val_loss_recorded": all(VAL_LOSS_KEY in record for record in history),
+        "val_ndcg@3_recorded": all(
+            VAL_NDCG_AT_3_KEY in record
+            for record in history
+        ),
         "val_ndcg_recorded": all(VAL_NDCG_KEY in record for record in history),
+        "top5_any_wcag_recorded": all(
+            TOP5_ANY_WCAG_PASS_RATE_KEY in record
+            for record in history
+        ),
         "val_not_collapsed": _not_collapsed(
             final_val_distribution,
             threshold=collapse_threshold,
@@ -542,6 +592,10 @@ def write_full_training_report(
         f"- best_metric: `{config.best_metric}`",
         f"- best_epoch: `{best_epoch}`",
         f"- best_metric_value: `{best_metric_value:.6f}`",
+        f"- model_name: `{config.model_name}`",
+        f"- dropout: `{config.dropout}`",
+        f"- weight_init: `{config.weight_init}`",
+        f"- activation: `{config.activation}`",
         f"- pretrained: `{pretrained}`",
         "",
         "## Datasets",
@@ -582,6 +636,12 @@ def write_full_training_report(
                 test_metrics=test_metrics,
             ),
             _metric_line(
+                VAL_NDCG_AT_3_KEY,
+                best_record=best_record,
+                final_record=final_record,
+                test_metrics=test_metrics,
+            ),
+            _metric_line(
                 VAL_NDCG_KEY,
                 best_record=best_record,
                 final_record=final_record,
@@ -589,6 +649,12 @@ def write_full_training_report(
             ),
             _metric_line(
                 TOP1_WCAG_PASS_RATE_KEY,
+                best_record=best_record,
+                final_record=final_record,
+                test_metrics=test_metrics,
+            ),
+            _metric_line(
+                TOP5_ANY_WCAG_PASS_RATE_KEY,
                 best_record=best_record,
                 final_record=final_record,
                 test_metrics=test_metrics,
@@ -611,10 +677,11 @@ def write_full_training_report(
             "## History",
             "",
             (
-                "| epoch | train_loss | val_loss | val_ndcg@5 | "
-                "top1_wcag_pass_rate | max_color_share |"
+                "| epoch | train_loss | val_loss | val_ndcg@3 | val_ndcg@5 | "
+                "top1_wcag_pass_rate | top5_any_wcag_pass_rate | "
+                "max_color_share |"
             ),
-            "| ---: | ---: | ---: | ---: | ---: | ---: |",
+            "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
         ]
     )
 
@@ -623,8 +690,10 @@ def write_full_training_report(
         lines.append(
             f"| {record['epoch']} | {float(record[TRAIN_LOSS_KEY]):.6f} | "
             f"{float(record[VAL_LOSS_KEY]):.6f} | "
+            f"{float(record[VAL_NDCG_AT_3_KEY]):.6f} | "
             f"{float(record[VAL_NDCG_KEY]):.6f} | "
             f"{float(record[TOP1_WCAG_PASS_RATE_KEY]):.6f} | "
+            f"{float(record[TOP5_ANY_WCAG_PASS_RATE_KEY]):.6f} | "
             f"{max(distribution):.6f} |"
         )
 
@@ -675,9 +744,13 @@ def run(args: argparse.Namespace) -> FullTrainingResult:
         for split in ("train", "val", "test")
     }
 
-    model = build_fixed_palette_resnet18(
+    model = build_title_color_model(
+        config.model_name,
         num_classes=config.num_classes,
         pretrained=args.pretrained,
+        dropout=config.dropout,
+        weight_init=config.weight_init,
+        activation=config.activation,
     )
     checkpoint_dir = resolve_project_path(config.checkpoint_dir)
     log_path = resolve_project_path(config.log_path)

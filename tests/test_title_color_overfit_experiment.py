@@ -69,6 +69,7 @@ def test_write_report_records_checks_and_metrics(
             "train_eval_loss": 1.0,
             "train_ndcg@5": 0.2,
             "top1_wcag_pass_rate": 0.5,
+            "top5_any_wcag_pass_rate": 1.0,
             "color_distribution": [0.5, 0.5] + [0.0] * 30,
         },
         {
@@ -77,6 +78,7 @@ def test_write_report_records_checks_and_metrics(
             "train_eval_loss": 0.7,
             "train_ndcg@5": 0.4,
             "top1_wcag_pass_rate": 0.5,
+            "top5_any_wcag_pass_rate": 1.0,
             "color_distribution": [0.5, 0.5] + [0.0] * 30,
         },
     ]
@@ -104,6 +106,7 @@ def test_write_report_records_checks_and_metrics(
     report = report_path.read_text(encoding="utf-8")
     assert "status: `PASS`" in report
     assert "train_ndcg@5" in report
+    assert "top5_any_wcag_pass_rate" in report
     assert "overfit_test.pt" in report
     assert "![Loss Curve](overfit_loss_curve.png)" in report
     assert "![NDCG Curve](overfit_ndcg_curve.png)" in report
@@ -125,6 +128,7 @@ def test_write_overfit_plots_creates_png_files(
             "train_eval_loss": 1.0,
             "train_ndcg@5": 0.2,
             "top1_wcag_pass_rate": 0.5,
+            "top5_any_wcag_pass_rate": 1.0,
             "color_distribution": [0.5, 0.5] + [0.0] * 30,
         },
         {
@@ -133,6 +137,7 @@ def test_write_overfit_plots_creates_png_files(
             "train_eval_loss": 0.7,
             "train_ndcg@5": 0.4,
             "top1_wcag_pass_rate": 0.5,
+            "top5_any_wcag_pass_rate": 1.0,
             "color_distribution": [0.4, 0.6] + [0.0] * 30,
         },
     ]

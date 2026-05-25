@@ -10,3 +10,7 @@ checkpoint_dir: outputs/checkpoints
 log_path: outputs/logs/training_metrics.jsonl
 best_metric: val_loss
 seed: 42
+model_name: resnet18
+dropout: 0.2
+weight_init: pytorch_default
+activation: silu
