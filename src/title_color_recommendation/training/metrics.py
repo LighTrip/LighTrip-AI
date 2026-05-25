@@ -10,15 +10,19 @@ from torch import Tensor
 @dataclass(frozen=True)
 class ValidationMetrics:
     val_loss: float
+    val_ndcg_at_3: float
     val_ndcg_at_5: float
     top1_wcag_pass_rate: float
+    top5_any_wcag_pass_rate: float
     color_distribution: list[float]
 
     def as_dict(self) -> dict[str, float | list[float]]:
         return {
             "val_loss": self.val_loss,
+            "val_ndcg@3": self.val_ndcg_at_3,
             "val_ndcg@5": self.val_ndcg_at_5,
             "top1_wcag_pass_rate": self.top1_wcag_pass_rate,
+            "top5_any_wcag_pass_rate": self.top5_any_wcag_pass_rate,
             "color_distribution": self.color_distribution,
         }
 
@@ -75,6 +79,25 @@ def top1_wcag_pass_rate(logits: Tensor, wcag_pass: Tensor) -> float:
     top1 = logits.argmax(dim=-1, keepdim=True)
     pass_values = wcag_pass.gather(dim=-1, index=top1)
     return float(pass_values.float().mean().item())
+
+
+def topk_any_wcag_pass_rate(logits: Tensor, wcag_pass: Tensor, *, k: int) -> float:
+    if logits.shape != wcag_pass.shape:
+        raise ValueError(
+            "logits and wcag_pass must have the same shape: "
+            f"logits={tuple(logits.shape)}, wcag={tuple(wcag_pass.shape)}"
+        )
+    if k <= 0:
+        raise ValueError(f"k must be positive: {k}")
+
+    top_k = min(k, logits.shape[-1])
+    indices = logits.topk(top_k, dim=-1).indices
+    pass_values = wcag_pass.gather(dim=-1, index=indices)
+    return float(pass_values.bool().any(dim=-1).float().mean().item())
+
+
+def top5_any_wcag_pass_rate(logits: Tensor, wcag_pass: Tensor) -> float:
+    return topk_any_wcag_pass_rate(logits, wcag_pass, k=5)
 
 
 def color_distribution(

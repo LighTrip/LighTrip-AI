@@ -20,6 +20,10 @@ class TrainingConfig:
     log_path: str = "outputs/title_color_recommendation/train_log.jsonl"
     best_metric: str = "val_loss"
     seed: int = 42
+    model_name: str = "resnet18"
+    dropout: float = 0.2
+    weight_init: str = "pytorch_default"
+    activation: str = "silu"
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)

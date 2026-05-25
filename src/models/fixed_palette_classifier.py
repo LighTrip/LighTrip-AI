@@ -65,6 +65,10 @@ def _make_four_channel_conv1(original_conv: nn.Conv2d) -> nn.Conv2d:
     return conv1
 
 
+def make_four_channel_conv1(original_conv: nn.Conv2d) -> nn.Conv2d:
+    return _make_four_channel_conv1(original_conv)
+
+
 def _make_classifier_head(
     *,
     in_features: int,

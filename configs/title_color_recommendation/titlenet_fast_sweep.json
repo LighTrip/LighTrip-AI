@@ -1,0 +1,71 @@
+{
+  "description": "Validation NDCG sweep for latency-optimized TitLeNet variants.",
+  "base": {
+    "batch_size": 64,
+    "epochs": 20,
+    "learning_rate": 0.0005,
+    "weight_decay": 0.0001,
+    "num_classes": 32,
+    "num_workers": 4,
+    "device": "cuda",
+    "scheduler": "cosine",
+    "best_metric": "val_ndcg@5",
+    "seed": 42,
+    "dropout": 0.2,
+    "weight_init": "small_head",
+    "activation": "hardswish"
+  },
+  "trials": [
+    {
+      "name": "titlenet_fast_a_hardswish",
+      "model_name": "titlenet_fast_a",
+      "activation": "hardswish"
+    },
+    {
+      "name": "titlenet_fast_a_relu",
+      "model_name": "titlenet_fast_a",
+      "activation": "relu"
+    },
+    {
+      "name": "titlenet_fast_a_gelu",
+      "model_name": "titlenet_fast_a",
+      "activation": "gelu"
+    },
+    {
+      "name": "titlenet_fast_b_hardswish",
+      "model_name": "titlenet_fast_b",
+      "activation": "hardswish"
+    },
+    {
+      "name": "titlenet_fast_b_relu",
+      "model_name": "titlenet_fast_b",
+      "activation": "relu"
+    },
+    {
+      "name": "titlenet_fast_b_gelu",
+      "model_name": "titlenet_fast_b",
+      "activation": "gelu"
+    },
+    {
+      "name": "titlenet_fast_c_hardswish",
+      "model_name": "titlenet_fast_c",
+      "activation": "hardswish"
+    },
+    {
+      "name": "titlenet_fast_c_relu",
+      "model_name": "titlenet_fast_c",
+      "activation": "relu"
+    },
+    {
+      "name": "titlenet_fast_c_gelu",
+      "model_name": "titlenet_fast_c",
+      "activation": "gelu"
+    },
+    {
+      "name": "titlenet_fast_b_hardswish_lr3e-4",
+      "model_name": "titlenet_fast_b",
+      "activation": "hardswish",
+      "learning_rate": 0.0003
+    }
+  ]
+}

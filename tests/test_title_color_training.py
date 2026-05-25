@@ -100,6 +100,20 @@ def test_validation_metrics_compute_expected_shapes(
 
     ndcg = training_modules["metrics"].mean_ndcg_at_k(logits, target, k=5)
     pass_rate = training_modules["metrics"].top1_wcag_pass_rate(logits, wcag_pass)
+    topk_logits = torch_module.tensor(
+        [
+            [9.0, 8.0, 7.0, 6.0, 5.0, 4.0],
+            [9.0, 8.0, 7.0, 6.0, 5.0, 4.0],
+        ],
+        dtype=torch_module.float32,
+    )
+    topk_wcag = torch_module.zeros((2, 6), dtype=torch_module.float32)
+    topk_wcag[0, 4] = 1.0
+    topk_wcag[1, 5] = 1.0
+    top5_pass_rate = training_modules["metrics"].top5_any_wcag_pass_rate(
+        topk_logits,
+        topk_wcag,
+    )
     distribution = training_modules["metrics"].color_distribution(
         logits,
         num_classes=32,
@@ -107,6 +121,7 @@ def test_validation_metrics_compute_expected_shapes(
 
     assert math.isclose(ndcg, 1.0, rel_tol=0.0, abs_tol=1e-6)
     assert math.isclose(pass_rate, 0.5, rel_tol=0.0, abs_tol=1e-6)
+    assert math.isclose(top5_pass_rate, 0.5, rel_tol=0.0, abs_tol=1e-6)
     assert len(distribution) == 32
     assert math.isclose(sum(distribution), 1.0, rel_tol=0.0, abs_tol=1e-6)
 
@@ -185,6 +200,8 @@ def test_fit_runs_one_epoch_and_writes_checkpoints(
     assert log_record["epoch"] == 1
     assert "train_loss" in log_record
     assert "val_loss" in log_record
+    assert "val_ndcg@3" in log_record
     assert "val_ndcg@5" in log_record
     assert "top1_wcag_pass_rate" in log_record
+    assert "top5_any_wcag_pass_rate" in log_record
     assert len(log_record["color_distribution"]) == 32

@@ -45,6 +45,10 @@ def test_build_training_config_uses_full_training_defaults(
     assert math.isclose(config.weight_decay, 1e-4, rel_tol=0.0, abs_tol=1e-12)
     assert config.checkpoint_dir == "outputs/checkpoints"
     assert config.log_path == "outputs/logs/training_metrics.jsonl"
+    assert config.model_name == "resnet18"
+    assert math.isclose(config.dropout, 0.2, rel_tol=0.0, abs_tol=1e-12)
+    assert config.weight_init == "pytorch_default"
+    assert config.activation == "silu"
 
 
 def test_full_training_report_records_test_metrics_and_plots(
@@ -67,15 +71,19 @@ def test_full_training_report_records_test_metrics_and_plots(
             "epoch": 1,
             "train_loss": 0.8,
             "val_loss": 0.7,
+            "val_ndcg@3": 0.3,
             "val_ndcg@5": 0.4,
             "top1_wcag_pass_rate": 0.5,
+            "top5_any_wcag_pass_rate": 0.8,
             "color_distribution": [0.4, 0.6] + [0.0] * 30,
         }
     ]
     test_metrics = full_training_module.ValidationMetrics(
         val_loss=0.6,
+        val_ndcg_at_3=0.45,
         val_ndcg_at_5=0.5,
         top1_wcag_pass_rate=0.7,
+        top5_any_wcag_pass_rate=0.9,
         color_distribution=[0.3, 0.7] + [0.0] * 30,
     )
     plot_paths = {
@@ -105,6 +113,8 @@ def test_full_training_report_records_test_metrics_and_plots(
     report = report_path.read_text(encoding="utf-8")
     assert "status: `PASS`" in report
     assert "checkpoint_best.pt" in report
+    assert "val_ndcg@3" in report
+    assert "top5_any_wcag_pass_rate" in report
     assert "![Loss Curve](loss_curve.png)" in report
     assert "![NDCG Curve](ndcg5_curve.png)" in report
     assert "![Color Distribution](color_distribution.png)" in report
@@ -129,8 +139,8 @@ def test_run_executes_one_epoch_with_stubbed_loaders(
     )
     monkeypatch.setattr(
         full_training_module,
-        "build_fixed_palette_resnet18",
-        lambda **_kwargs: tiny_classifier(nn_module),
+        "build_title_color_model",
+        lambda *_args, **_kwargs: tiny_classifier(nn_module),
     )
 
     args = full_training_module.parse_args(

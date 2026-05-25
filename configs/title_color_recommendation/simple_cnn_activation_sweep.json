@@ -1,0 +1,40 @@
+{
+  "description": "Activation sweep for the current SimpleCNN-M lightweight candidate.",
+  "base": {
+    "batch_size": 64,
+    "epochs": 20,
+    "learning_rate": 0.0005,
+    "weight_decay": 0.0005,
+    "num_classes": 32,
+    "num_workers": 4,
+    "device": "cuda",
+    "scheduler": "cosine",
+    "best_metric": "val_ndcg@5",
+    "seed": 42,
+    "model_name": "simple_cnn_m",
+    "dropout": 0.3,
+    "weight_init": "small_head"
+  },
+  "trials": [
+    {
+      "name": "simple_cnn_m_silu",
+      "activation": "silu"
+    },
+    {
+      "name": "simple_cnn_m_hardswish",
+      "activation": "hardswish"
+    },
+    {
+      "name": "simple_cnn_m_gelu",
+      "activation": "gelu"
+    },
+    {
+      "name": "simple_cnn_m_relu",
+      "activation": "relu"
+    },
+    {
+      "name": "simple_cnn_m_leaky_relu",
+      "activation": "leaky_relu"
+    }
+  ]
+}

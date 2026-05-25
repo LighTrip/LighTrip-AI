@@ -1,0 +1,92 @@
+{
+  "description": "Validation-driven sweep for custom title color models with weight initialization variants.",
+  "base": {
+    "batch_size": 64,
+    "epochs": 20,
+    "learning_rate": 0.0005,
+    "weight_decay": 0.0001,
+    "num_classes": 32,
+    "num_workers": 4,
+    "device": "cuda",
+    "scheduler": "cosine",
+    "best_metric": "val_loss",
+    "seed": 42,
+    "dropout": 0.2,
+    "weight_init": "kaiming_normal",
+    "activation": "silu"
+  },
+  "trials": [
+    {
+      "name": "simple_cnn_lr3e-4_wd1e-4_kaiming",
+      "model_name": "simple_cnn",
+      "learning_rate": 0.0003,
+      "weight_decay": 0.0001,
+      "weight_init": "kaiming_normal"
+    },
+    {
+      "name": "simple_cnn_lr5e-4_wd1e-4_kaiming",
+      "model_name": "simple_cnn",
+      "learning_rate": 0.0005,
+      "weight_decay": 0.0001,
+      "weight_init": "kaiming_normal"
+    },
+    {
+      "name": "simple_cnn_lr1e-3_wd1e-4_kaiming",
+      "model_name": "simple_cnn",
+      "learning_rate": 0.001,
+      "weight_decay": 0.0001,
+      "weight_init": "kaiming_normal"
+    },
+    {
+      "name": "simple_cnn_lr5e-4_wd5e-4_small_head",
+      "model_name": "simple_cnn",
+      "learning_rate": 0.0005,
+      "weight_decay": 0.0005,
+      "dropout": 0.3,
+      "weight_init": "small_head"
+    },
+    {
+      "name": "mask_aware_cnn_lr3e-4_wd1e-4_kaiming",
+      "model_name": "mask_aware_cnn",
+      "learning_rate": 0.0003,
+      "weight_decay": 0.0001,
+      "weight_init": "kaiming_normal"
+    },
+    {
+      "name": "mask_aware_cnn_lr5e-4_wd1e-4_kaiming",
+      "model_name": "mask_aware_cnn",
+      "learning_rate": 0.0005,
+      "weight_decay": 0.0001,
+      "weight_init": "kaiming_normal"
+    },
+    {
+      "name": "mask_aware_cnn_lr1e-3_wd1e-4_kaiming",
+      "model_name": "mask_aware_cnn",
+      "learning_rate": 0.001,
+      "weight_decay": 0.0001,
+      "weight_init": "kaiming_normal"
+    },
+    {
+      "name": "mask_aware_cnn_lr5e-4_wd5e-4_small_head",
+      "model_name": "mask_aware_cnn",
+      "learning_rate": 0.0005,
+      "weight_decay": 0.0005,
+      "dropout": 0.3,
+      "weight_init": "small_head"
+    },
+    {
+      "name": "mask_aware_palette_net_lr3e-4_small_head",
+      "model_name": "mask_aware_palette_net",
+      "learning_rate": 0.0003,
+      "weight_decay": 0.0001,
+      "weight_init": "small_head"
+    },
+    {
+      "name": "mask_aware_palette_net_lr5e-4_small_head",
+      "model_name": "mask_aware_palette_net",
+      "learning_rate": 0.0005,
+      "weight_decay": 0.0001,
+      "weight_init": "small_head"
+    }
+  ]
+}

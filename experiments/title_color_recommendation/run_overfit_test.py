@@ -37,6 +37,7 @@ TRAIN_LOSS_KEY = "train_loss"
 TRAIN_EVAL_LOSS_KEY = "train_eval_loss"
 TRAIN_NDCG_KEY = "train_ndcg@5"
 TOP1_WCAG_PASS_RATE_KEY = "top1_wcag_pass_rate"
+TOP5_ANY_WCAG_PASS_RATE_KEY = "top5_any_wcag_pass_rate"
 COLOR_DISTRIBUTION_KEY = "color_distribution"
 
 
@@ -183,6 +184,7 @@ def metric_record(
         TRAIN_EVAL_LOSS_KEY: train_metrics.val_loss,
         TRAIN_NDCG_KEY: train_metrics.val_ndcg_at_5,
         TOP1_WCAG_PASS_RATE_KEY: train_metrics.top1_wcag_pass_rate,
+        TOP5_ANY_WCAG_PASS_RATE_KEY: train_metrics.top5_any_wcag_pass_rate,
         COLOR_DISTRIBUTION_KEY: train_metrics.color_distribution,
     }
     if train_loss is not None:
@@ -421,6 +423,11 @@ def write_report(
                 f"| top1_wcag_pass_rate | "
                 f"{float(initial[TOP1_WCAG_PASS_RATE_KEY]):.6f} | "
                 f"{float(final[TOP1_WCAG_PASS_RATE_KEY]):.6f} |"
+            ),
+            (
+                f"| top5_any_wcag_pass_rate | "
+                f"{float(initial[TOP5_ANY_WCAG_PASS_RATE_KEY]):.6f} | "
+                f"{float(final[TOP5_ANY_WCAG_PASS_RATE_KEY]):.6f} |"
             ),
             f"| max_color_share | - | {max_color_share:.6f} |",
             "",
