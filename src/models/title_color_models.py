@@ -39,15 +39,29 @@ PALETTE_GROUPS = (
     "other",
 )
 PALETTE_FEATURE_DIM = 16
-DEFAULT_ACTIVATION = "silu"
+ACTIVATION_SILU = "silu"
+ACTIVATION_RELU = "relu"
+ACTIVATION_GELU = "gelu"
+ACTIVATION_HARDSWISH = "hardswish"
+ACTIVATION_LEAKY_RELU = "leaky_relu"
+DEFAULT_ACTIVATION = ACTIVATION_SILU
+ODD_KERNEL_ERROR = "kernel_size must be odd: {kernel_size}"
+CHANNELS_MIN_ERROR = "channels must contain at least two entries"
+EMPTY_ABLATED_PARTS: frozenset[str] = frozenset()
 ACTIVATION_ALIASES = {
-    "swish": "silu",
-    "hard_swish": "hardswish",
-    "hard-swish": "hardswish",
-    "leaky-relu": "leaky_relu",
-    "leakyrelu": "leaky_relu",
+    "swish": ACTIVATION_SILU,
+    "hard_swish": ACTIVATION_HARDSWISH,
+    "hard-swish": ACTIVATION_HARDSWISH,
+    "leaky-relu": ACTIVATION_LEAKY_RELU,
+    "leakyrelu": ACTIVATION_LEAKY_RELU,
 }
-ACTIVATION_NAMES = ("silu", "relu", "gelu", "hardswish", "leaky_relu")
+ACTIVATION_NAMES = (
+    ACTIVATION_SILU,
+    ACTIVATION_RELU,
+    ACTIVATION_GELU,
+    ACTIVATION_HARDSWISH,
+    ACTIVATION_LEAKY_RELU,
+)
 
 
 def normalize_activation_name(name: str | None) -> str:
@@ -63,13 +77,13 @@ def normalize_activation_name(name: str | None) -> str:
 
 def make_activation(name: str | None = DEFAULT_ACTIVATION) -> nn.Module:
     normalized = normalize_activation_name(name)
-    if normalized == "relu":
+    if normalized == ACTIVATION_RELU:
         return nn.ReLU(inplace=True)
-    if normalized == "gelu":
+    if normalized == ACTIVATION_GELU:
         return nn.GELU()
-    if normalized == "hardswish":
+    if normalized == ACTIVATION_HARDSWISH:
         return nn.Hardswish(inplace=True)
-    if normalized == "leaky_relu":
+    if normalized == ACTIVATION_LEAKY_RELU:
         return nn.LeakyReLU(negative_slope=0.1, inplace=True)
     return nn.SiLU(inplace=True)
 
@@ -254,7 +268,7 @@ class DepthwiseSeparableConv(nn.Module):
     ) -> None:
         super().__init__()
         if kernel_size % 2 != 1:
-            raise ValueError(f"kernel_size must be odd: {kernel_size}")
+            raise ValueError(ODD_KERNEL_ERROR.format(kernel_size=kernel_size))
         self.block = nn.Sequential(
             nn.Conv2d(
                 in_channels,
@@ -268,6 +282,32 @@ class DepthwiseSeparableConv(nn.Module):
             nn.BatchNorm2d(in_channels),
             make_activation(activation),
             nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            make_activation(activation),
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.block(x)
+
+
+class PointwiseProjection(nn.Module):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        *,
+        stride: int = 1,
+        activation: str = DEFAULT_ACTIVATION,
+    ) -> None:
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.Conv2d(
+                in_channels,
+                out_channels,
+                kernel_size=1,
+                stride=stride,
+                bias=False,
+            ),
             nn.BatchNorm2d(out_channels),
             make_activation(activation),
         )
@@ -296,7 +336,7 @@ class EfficientChannelAttention(nn.Module):
     def __init__(self, channels: int, *, kernel_size: int = 3) -> None:
         super().__init__()
         if kernel_size % 2 != 1:
-            raise ValueError(f"kernel_size must be odd: {kernel_size}")
+            raise ValueError(ODD_KERNEL_ERROR.format(kernel_size=kernel_size))
         self.pool = nn.AdaptiveAvgPool2d((1, 1))
         self.conv = nn.Conv1d(
             1,
@@ -333,7 +373,7 @@ class ResidualDepthwiseSeparableBlock(nn.Module):
         if use_se and use_eca:
             raise ValueError("use_se and use_eca cannot both be enabled")
         if kernel_size % 2 != 1:
-            raise ValueError(f"kernel_size must be odd: {kernel_size}")
+            raise ValueError(ODD_KERNEL_ERROR.format(kernel_size=kernel_size))
         self.block = nn.Sequential(
             nn.Conv2d(
                 channels,
@@ -373,7 +413,7 @@ class LightweightFeatureExtractor(nn.Module):
     ) -> None:
         super().__init__()
         if len(channels) < 2:
-            raise ValueError("channels must contain at least two entries")
+            raise ValueError(CHANNELS_MIN_ERROR)
         layers: list[nn.Module] = [
             nn.Conv2d(in_channels, channels[0], kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(channels[0]),
@@ -408,7 +448,7 @@ class ResidualLightweightFeatureExtractor(nn.Module):
     ) -> None:
         super().__init__()
         if len(channels) < 2:
-            raise ValueError("channels must contain at least two entries")
+            raise ValueError(CHANNELS_MIN_ERROR)
         if len(residual_blocks) != len(channels) - 1:
             raise ValueError("residual_blocks must match downsample stages")
 
@@ -441,6 +481,91 @@ class ResidualLightweightFeatureExtractor(nn.Module):
                 )
         self.net = nn.Sequential(*layers)
         self.out_channels = channels[-1]
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.net(x)
+
+
+class StageAblatedResidualFeatureExtractor(nn.Module):
+    def __init__(
+        self,
+        *,
+        in_channels: int = 4,
+        channels: tuple[int, ...] = (48, 96, 128, 160),
+        residual_blocks: tuple[int, ...] = (1, 1, 2),
+        ablated_parts: frozenset[str] = EMPTY_ABLATED_PARTS,
+        use_se: bool = True,
+        use_eca: bool = False,
+        activation: str = DEFAULT_ACTIVATION,
+    ) -> None:
+        super().__init__()
+        if len(channels) < 2:
+            raise ValueError(CHANNELS_MIN_ERROR)
+        if len(residual_blocks) != len(channels) - 1:
+            raise ValueError("residual_blocks must match downsample stages")
+
+        layers: list[nn.Module] = [
+            self._stem_layer(
+                in_channels,
+                channels[0],
+                ablated_parts=ablated_parts,
+                activation=activation,
+            )
+        ]
+        for stage_index, (input_channels, output_channels, block_count) in enumerate(
+            zip(channels, channels[1:], residual_blocks),
+            start=1,
+        ):
+            stage_name = f"stage{stage_index}"
+            if stage_name in ablated_parts:
+                layers.append(
+                    PointwiseProjection(
+                        input_channels,
+                        output_channels,
+                        stride=2,
+                        activation=activation,
+                    )
+                )
+                continue
+            layers.append(
+                DepthwiseSeparableConv(
+                    input_channels,
+                    output_channels,
+                    stride=2,
+                    activation=activation,
+                )
+            )
+            layers.extend(
+                ResidualDepthwiseSeparableBlock(
+                    output_channels,
+                    use_se=use_se,
+                    use_eca=use_eca,
+                    activation=activation,
+                )
+                for _index in range(block_count)
+            )
+        self.net = nn.Sequential(*layers)
+        self.out_channels = channels[-1]
+
+    @staticmethod
+    def _stem_layer(
+        in_channels: int,
+        out_channels: int,
+        *,
+        ablated_parts: frozenset[str],
+        activation: str,
+    ) -> nn.Module:
+        if "stem" in ablated_parts:
+            return PointwiseProjection(
+                in_channels,
+                out_channels,
+                activation=activation,
+            )
+        return nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            make_activation(activation),
+        )
 
     def forward(self, x: Tensor) -> Tensor:
         return self.net(x)
@@ -552,6 +677,42 @@ class ResidualSimpleCNN(nn.Module):
             residual_blocks=residual_blocks,
             use_se=use_se,
             use_eca=use_eca,
+            activation=self.activation,
+        )
+        feature_dim = self.features.out_channels
+        self.head = nn.Sequential(
+            nn.AdaptiveAvgPool2d((1, 1)),
+            nn.Flatten(),
+            nn.Linear(feature_dim, hidden_dim),
+            make_activation(self.activation),
+            nn.Dropout(p=dropout),
+            nn.Linear(hidden_dim, num_classes),
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.head(self.features(x))
+
+
+class StageAblatedTitLeNet(nn.Module):
+    def __init__(
+        self,
+        *,
+        num_classes: int = DEFAULT_NUM_CLASSES,
+        hidden_dim: int = 192,
+        feature_channels: tuple[int, ...] = (48, 96, 128, 160),
+        residual_blocks: tuple[int, ...] = (1, 1, 2),
+        ablated_parts: frozenset[str] = EMPTY_ABLATED_PARTS,
+        dropout: float = 0.2,
+        activation: str = DEFAULT_ACTIVATION,
+    ) -> None:
+        super().__init__()
+        self.activation = normalize_activation_name(activation)
+        self.ablated_parts = ablated_parts
+        self.features = StageAblatedResidualFeatureExtractor(
+            channels=feature_channels,
+            residual_blocks=residual_blocks,
+            ablated_parts=ablated_parts,
+            use_se=True,
             activation=self.activation,
         )
         feature_dim = self.features.out_channels
@@ -901,7 +1062,7 @@ class TinyVisionTransformer(nn.Module):
             nhead=num_heads,
             dim_feedforward=mlp_dim,
             dropout=dropout,
-            activation="gelu",
+            activation=ACTIVATION_GELU,
             batch_first=True,
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=depth)
@@ -971,7 +1132,7 @@ class TitleHybridTransformer(nn.Module):
             nhead=num_heads,
             dim_feedforward=mlp_dim,
             dropout=dropout,
-            activation="gelu",
+            activation=ACTIVATION_GELU,
             batch_first=True,
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=depth)
@@ -1091,7 +1252,7 @@ class MaskAwareTinyHybridColorRanker(nn.Module):
             nhead=num_heads,
             dim_feedforward=mlp_dim,
             dropout=dropout,
-            activation="gelu",
+            activation=ACTIVATION_GELU,
             batch_first=True,
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=depth)
@@ -1264,6 +1425,29 @@ def build_simple_cnn_medium(
     )
 
 
+def _build_residual_simple_cnn_variant(
+    *,
+    num_classes: int,
+    hidden_dim: int,
+    feature_channels: tuple[int, ...],
+    residual_blocks: tuple[int, ...],
+    dropout: float,
+    activation: str,
+    use_se: bool = False,
+    use_eca: bool = False,
+) -> ResidualSimpleCNN:
+    return ResidualSimpleCNN(
+        num_classes=num_classes,
+        hidden_dim=hidden_dim,
+        feature_channels=feature_channels,
+        residual_blocks=residual_blocks,
+        use_se=use_se,
+        use_eca=use_eca,
+        dropout=dropout,
+        activation=activation,
+    )
+
+
 def build_simple_cnn_medium_residual(
     *,
     num_classes: int = DEFAULT_NUM_CLASSES,
@@ -1271,7 +1455,7 @@ def build_simple_cnn_medium_residual(
     activation: str = DEFAULT_ACTIVATION,
     **_kwargs: Any,
 ) -> ResidualSimpleCNN:
-    return ResidualSimpleCNN(
+    return _build_residual_simple_cnn_variant(
         num_classes=num_classes,
         hidden_dim=192,
         feature_channels=(48, 96, 128, 160),
@@ -1288,7 +1472,7 @@ def build_simple_cnn_medium_residual_deeper(
     activation: str = DEFAULT_ACTIVATION,
     **_kwargs: Any,
 ) -> ResidualSimpleCNN:
-    return ResidualSimpleCNN(
+    return _build_residual_simple_cnn_variant(
         num_classes=num_classes,
         hidden_dim=192,
         feature_channels=(48, 96, 128, 160),
@@ -1305,7 +1489,7 @@ def build_simple_cnn_medium_residual_se(
     activation: str = DEFAULT_ACTIVATION,
     **_kwargs: Any,
 ) -> ResidualSimpleCNN:
-    return ResidualSimpleCNN(
+    return _build_residual_simple_cnn_variant(
         num_classes=num_classes,
         hidden_dim=192,
         feature_channels=(48, 96, 128, 160),
@@ -1323,7 +1507,7 @@ def build_titlenet_fast_a(
     activation: str = DEFAULT_ACTIVATION,
     **_kwargs: Any,
 ) -> ResidualSimpleCNN:
-    return ResidualSimpleCNN(
+    return _build_residual_simple_cnn_variant(
         num_classes=num_classes,
         hidden_dim=192,
         feature_channels=(48, 96, 128, 160),
@@ -1340,7 +1524,7 @@ def build_titlenet_fast_b(
     activation: str = DEFAULT_ACTIVATION,
     **_kwargs: Any,
 ) -> ResidualSimpleCNN:
-    return ResidualSimpleCNN(
+    return _build_residual_simple_cnn_variant(
         num_classes=num_classes,
         hidden_dim=192,
         feature_channels=(48, 96, 128, 160),
@@ -1358,12 +1542,136 @@ def build_titlenet_fast_c(
     activation: str = DEFAULT_ACTIVATION,
     **_kwargs: Any,
 ) -> ResidualSimpleCNN:
-    return ResidualSimpleCNN(
+    return _build_residual_simple_cnn_variant(
         num_classes=num_classes,
         hidden_dim=192,
         feature_channels=(48, 96, 128, 160),
         residual_blocks=(0, 1, 1),
         use_eca=True,
+        dropout=dropout,
+        activation=activation,
+    )
+
+
+VARIANT_HIDDEN_DIM = "hidden_dim"
+VARIANT_FEATURE_CHANNELS = "feature_channels"
+VARIANT_RESIDUAL_BLOCKS = "residual_blocks"
+VARIANT_USE_SE = "use_se"
+VARIANT_USE_ECA = "use_eca"
+
+
+TITLENET_ABLATION_VARIANTS: dict[str, dict[str, Any]] = {
+    "no_se": {
+        VARIANT_HIDDEN_DIM: 192,
+        VARIANT_FEATURE_CHANNELS: (48, 96, 128, 160),
+        VARIANT_RESIDUAL_BLOCKS: (1, 1, 2),
+    },
+    "no_residual": {
+        VARIANT_HIDDEN_DIM: 192,
+        VARIANT_FEATURE_CHANNELS: (48, 96, 128, 160),
+        VARIANT_RESIDUAL_BLOCKS: (0, 0, 0),
+    },
+    "no_first_residual": {
+        VARIANT_HIDDEN_DIM: 192,
+        VARIANT_FEATURE_CHANNELS: (48, 96, 128, 160),
+        VARIANT_RESIDUAL_BLOCKS: (0, 1, 2),
+        VARIANT_USE_SE: True,
+    },
+    "no_middle_residual": {
+        VARIANT_HIDDEN_DIM: 192,
+        VARIANT_FEATURE_CHANNELS: (48, 96, 128, 160),
+        VARIANT_RESIDUAL_BLOCKS: (1, 0, 2),
+        VARIANT_USE_SE: True,
+    },
+    "no_last_residual": {
+        VARIANT_HIDDEN_DIM: 192,
+        VARIANT_FEATURE_CHANNELS: (48, 96, 128, 160),
+        VARIANT_RESIDUAL_BLOCKS: (1, 1, 0),
+        VARIANT_USE_SE: True,
+    },
+    "no_last_extra_residual": {
+        VARIANT_HIDDEN_DIM: 192,
+        VARIANT_FEATURE_CHANNELS: (48, 96, 128, 160),
+        VARIANT_RESIDUAL_BLOCKS: (1, 1, 1),
+        VARIANT_USE_SE: True,
+    },
+    "eca": {
+        VARIANT_HIDDEN_DIM: 192,
+        VARIANT_FEATURE_CHANNELS: (48, 96, 128, 160),
+        VARIANT_RESIDUAL_BLOCKS: (1, 1, 2),
+        VARIANT_USE_ECA: True,
+    },
+    "narrow": {
+        VARIANT_HIDDEN_DIM: 160,
+        VARIANT_FEATURE_CHANNELS: (32, 64, 96, 128),
+        VARIANT_RESIDUAL_BLOCKS: (1, 1, 2),
+        VARIANT_USE_SE: True,
+    },
+    "wide": {
+        VARIANT_HIDDEN_DIM: 256,
+        VARIANT_FEATURE_CHANNELS: (64, 128, 160, 192),
+        VARIANT_RESIDUAL_BLOCKS: (1, 1, 2),
+        VARIANT_USE_SE: True,
+    },
+    "shallow": {
+        VARIANT_HIDDEN_DIM: 192,
+        VARIANT_FEATURE_CHANNELS: (48, 96, 128, 160),
+        VARIANT_RESIDUAL_BLOCKS: (1, 1, 1),
+        VARIANT_USE_SE: True,
+    },
+    "deeper": {
+        VARIANT_HIDDEN_DIM: 192,
+        VARIANT_FEATURE_CHANNELS: (48, 96, 128, 160),
+        VARIANT_RESIDUAL_BLOCKS: (1, 2, 3),
+        VARIANT_USE_SE: True,
+    },
+}
+TITLENET_STAGE_ABLATION_PARTS: dict[str, frozenset[str]] = {
+    "no_stem": frozenset({"stem"}),
+    "no_stage1": frozenset({"stage1"}),
+    "no_stage2": frozenset({"stage2"}),
+    "no_stage3": frozenset({"stage3"}),
+}
+
+
+def build_titlenet_ablation_variant(
+    *,
+    variant: str,
+    num_classes: int = DEFAULT_NUM_CLASSES,
+    dropout: float = 0.2,
+    activation: str = DEFAULT_ACTIVATION,
+    **_kwargs: Any,
+) -> ResidualSimpleCNN:
+    try:
+        variant_config = TITLENET_ABLATION_VARIANTS[variant]
+    except KeyError as exc:
+        available = ", ".join(sorted(TITLENET_ABLATION_VARIANTS))
+        raise ValueError(f"unknown titlenet ablation variant={variant!r}: {available}") from exc
+    return _build_residual_simple_cnn_variant(
+        num_classes=num_classes,
+        dropout=dropout,
+        activation=activation,
+        **variant_config,
+    )
+
+
+def build_titlenet_stage_ablation_variant(
+    *,
+    variant: str,
+    num_classes: int = DEFAULT_NUM_CLASSES,
+    dropout: float = 0.2,
+    activation: str = DEFAULT_ACTIVATION,
+    **_kwargs: Any,
+) -> StageAblatedTitLeNet:
+    try:
+        ablated_parts = TITLENET_STAGE_ABLATION_PARTS[variant]
+    except KeyError as exc:
+        available = ", ".join(sorted(TITLENET_STAGE_ABLATION_PARTS))
+        message = f"unknown titlenet stage ablation variant={variant!r}: {available}"
+        raise ValueError(message) from exc
+    return StageAblatedTitLeNet(
+        num_classes=num_classes,
+        ablated_parts=ablated_parts,
         dropout=dropout,
         activation=activation,
     )

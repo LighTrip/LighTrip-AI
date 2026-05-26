@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import partial
 from typing import Callable
 
 from torch import nn
@@ -35,15 +36,57 @@ from src.models.title_color_models import (
     build_swin_tiny_classifier,
     build_title_hybrid_fast,
     build_title_hybrid_tiny,
+    build_titlenet_ablation_variant,
     build_titlenet_fast_a,
     build_titlenet_fast_b,
     build_titlenet_fast_c,
+    build_titlenet_stage_ablation_variant,
     build_vit_tiny,
     normalize_activation_name,
 )
 
 
 ModelBuilder = Callable[..., nn.Module]
+MODEL_RESNET18 = "resnet18"
+MODEL_RESNET34 = "resnet34"
+MODEL_EFFICIENTNET_B0 = "efficientnet_b0"
+MODEL_CONVNEXT_TINY = "convnext_tiny"
+MODEL_VIT_TINY = "vit_tiny"
+MODEL_TITLE_HYBRID_TINY = "title_hybrid_tiny"
+MODEL_TITLE_HYBRID_FAST = "title_hybrid_fast"
+MODEL_SWIN_TINY = "swin_tiny"
+MODEL_FLATTEN_MLP = "flatten_mlp"
+MODEL_SIMPLE_CNN = "simple_cnn"
+MODEL_SIMPLE_CNN_M = "simple_cnn_m"
+MODEL_SIMPLE_CNN_M_RES = "simple_cnn_m_res"
+MODEL_SIMPLE_CNN_M_RES_MASK_POOL = "simple_cnn_m_res_mask_pool"
+MODEL_SIMPLE_CNN_M_RES_SE = "simple_cnn_m_res_se"
+MODEL_SIMPLE_CNN_M_RES_DEEPER = "simple_cnn_m_res_deeper"
+MODEL_SIMPLE_CNN_M_MASK_POOL = "simple_cnn_m_mask_pool"
+MODEL_SIMPLE_CNN_L = "simple_cnn_l"
+MODEL_TITLENET = "titlenet"
+MODEL_TITLENET_FAST_A = "titlenet_fast_a"
+MODEL_TITLENET_FAST_B = "titlenet_fast_b"
+MODEL_TITLENET_FAST_C = "titlenet_fast_c"
+MODEL_MASK_AWARE_CNN = "mask_aware_cnn"
+MODEL_MASK_AWARE_CNN_M = "mask_aware_cnn_m"
+MODEL_MASK_AWARE_PALETTE_NET = "mask_aware_palette_net"
+MODEL_MASK_AWARE_TINY_HYBRID_RANKER = "mask_aware_tiny_hybrid_ranker"
+TITLENET_NO_SE = "titlenet_no_se"
+TITLENET_NO_RESIDUAL = "titlenet_no_residual"
+TITLENET_NO_FIRST_RESIDUAL = "titlenet_no_first_residual"
+TITLENET_NO_MIDDLE_RESIDUAL = "titlenet_no_middle_residual"
+TITLENET_NO_LAST_RESIDUAL = "titlenet_no_last_residual"
+TITLENET_NO_LAST_EXTRA_RESIDUAL = "titlenet_no_last_extra_residual"
+TITLENET_NO_STEM = "titlenet_no_stem"
+TITLENET_NO_STAGE1 = "titlenet_no_stage1"
+TITLENET_NO_STAGE2 = "titlenet_no_stage2"
+TITLENET_NO_STAGE3 = "titlenet_no_stage3"
+TITLENET_ECA = "titlenet_eca"
+TITLENET_NARROW = "titlenet_narrow"
+TITLENET_WIDE = "titlenet_wide"
+TITLENET_SHALLOW = "titlenet_shallow"
+TITLENET_DEEPER = "titlenet_deeper"
 
 
 @dataclass(frozen=True)
@@ -58,153 +101,268 @@ def _custom_spec(name: str, builder: ModelBuilder) -> ModelSpec:
     return ModelSpec(name=name, builder=builder, supports_activation=True)
 
 
+def _titlenet_ablation_spec(name: str, variant: str) -> ModelSpec:
+    return _custom_spec(
+        name,
+        partial(build_titlenet_ablation_variant, variant=variant),
+    )
+
+
+def _titlenet_stage_ablation_spec(name: str, variant: str) -> ModelSpec:
+    return _custom_spec(
+        name,
+        partial(build_titlenet_stage_ablation_variant, variant=variant),
+    )
+
+
 MODEL_SPECS: dict[str, ModelSpec] = {
-    "resnet18": ModelSpec(
-        name="resnet18",
+    MODEL_RESNET18: ModelSpec(
+        name=MODEL_RESNET18,
         builder=build_fixed_palette_resnet18,
         supports_pretrained=True,
     ),
-    "resnet34": ModelSpec(
-        name="resnet34",
+    MODEL_RESNET34: ModelSpec(
+        name=MODEL_RESNET34,
         builder=build_resnet34_classifier,
         supports_pretrained=True,
     ),
-    "efficientnet_b0": ModelSpec(
-        name="efficientnet_b0",
+    MODEL_EFFICIENTNET_B0: ModelSpec(
+        name=MODEL_EFFICIENTNET_B0,
         builder=build_efficientnet_b0_classifier,
         supports_pretrained=True,
     ),
-    "convnext_tiny": ModelSpec(
-        name="convnext_tiny",
+    MODEL_CONVNEXT_TINY: ModelSpec(
+        name=MODEL_CONVNEXT_TINY,
         builder=build_convnext_tiny_classifier,
         supports_pretrained=True,
     ),
-    "vit_tiny": ModelSpec(name="vit_tiny", builder=build_vit_tiny),
-    "title_hybrid_tiny": _custom_spec(
-        "title_hybrid_tiny",
+    MODEL_VIT_TINY: ModelSpec(name=MODEL_VIT_TINY, builder=build_vit_tiny),
+    MODEL_TITLE_HYBRID_TINY: _custom_spec(
+        MODEL_TITLE_HYBRID_TINY,
         build_title_hybrid_tiny,
     ),
-    "title_hybrid_fast": _custom_spec(
-        "title_hybrid_fast",
+    MODEL_TITLE_HYBRID_FAST: _custom_spec(
+        MODEL_TITLE_HYBRID_FAST,
         build_title_hybrid_fast,
     ),
-    "swin_tiny": ModelSpec(
-        name="swin_tiny",
+    MODEL_SWIN_TINY: ModelSpec(
+        name=MODEL_SWIN_TINY,
         builder=build_swin_tiny_classifier,
         supports_pretrained=True,
     ),
-    "flatten_mlp": ModelSpec(name="flatten_mlp", builder=build_flatten_mlp),
-    "simple_cnn": _custom_spec("simple_cnn", build_simple_cnn),
-    "simple_cnn_m": _custom_spec("simple_cnn_m", build_simple_cnn_medium),
-    "simple_cnn_m_res": _custom_spec(
-        "simple_cnn_m_res",
+    MODEL_FLATTEN_MLP: ModelSpec(name=MODEL_FLATTEN_MLP, builder=build_flatten_mlp),
+    MODEL_SIMPLE_CNN: _custom_spec(MODEL_SIMPLE_CNN, build_simple_cnn),
+    MODEL_SIMPLE_CNN_M: _custom_spec(MODEL_SIMPLE_CNN_M, build_simple_cnn_medium),
+    MODEL_SIMPLE_CNN_M_RES: _custom_spec(
+        MODEL_SIMPLE_CNN_M_RES,
         build_simple_cnn_medium_residual,
     ),
-    "simple_cnn_m_res_mask_pool": _custom_spec(
-        "simple_cnn_m_res_mask_pool",
+    MODEL_SIMPLE_CNN_M_RES_MASK_POOL: _custom_spec(
+        MODEL_SIMPLE_CNN_M_RES_MASK_POOL,
         build_simple_cnn_medium_residual_mask_pool,
     ),
-    "simple_cnn_m_res_se": _custom_spec(
-        "simple_cnn_m_res_se",
+    MODEL_SIMPLE_CNN_M_RES_SE: _custom_spec(
+        MODEL_SIMPLE_CNN_M_RES_SE,
         build_simple_cnn_medium_residual_se,
     ),
-    "titlenet": _custom_spec(
-        "titlenet",
+    MODEL_TITLENET: _custom_spec(
+        MODEL_TITLENET,
         build_simple_cnn_medium_residual_se,
     ),
-    "titlenet_fast_a": _custom_spec(
-        "titlenet_fast_a",
+    TITLENET_NO_SE: _titlenet_ablation_spec(TITLENET_NO_SE, "no_se"),
+    TITLENET_NO_RESIDUAL: _titlenet_ablation_spec(
+        TITLENET_NO_RESIDUAL,
+        "no_residual",
+    ),
+    TITLENET_NO_FIRST_RESIDUAL: _titlenet_ablation_spec(
+        TITLENET_NO_FIRST_RESIDUAL,
+        "no_first_residual",
+    ),
+    TITLENET_NO_MIDDLE_RESIDUAL: _titlenet_ablation_spec(
+        TITLENET_NO_MIDDLE_RESIDUAL,
+        "no_middle_residual",
+    ),
+    TITLENET_NO_LAST_RESIDUAL: _titlenet_ablation_spec(
+        TITLENET_NO_LAST_RESIDUAL,
+        "no_last_residual",
+    ),
+    TITLENET_NO_LAST_EXTRA_RESIDUAL: _titlenet_ablation_spec(
+        TITLENET_NO_LAST_EXTRA_RESIDUAL,
+        "no_last_extra_residual",
+    ),
+    TITLENET_NO_STEM: _titlenet_stage_ablation_spec(
+        TITLENET_NO_STEM,
+        "no_stem",
+    ),
+    TITLENET_NO_STAGE1: _titlenet_stage_ablation_spec(
+        TITLENET_NO_STAGE1,
+        "no_stage1",
+    ),
+    TITLENET_NO_STAGE2: _titlenet_stage_ablation_spec(
+        TITLENET_NO_STAGE2,
+        "no_stage2",
+    ),
+    TITLENET_NO_STAGE3: _titlenet_stage_ablation_spec(
+        TITLENET_NO_STAGE3,
+        "no_stage3",
+    ),
+    TITLENET_ECA: _titlenet_ablation_spec(TITLENET_ECA, "eca"),
+    TITLENET_NARROW: _titlenet_ablation_spec(TITLENET_NARROW, "narrow"),
+    TITLENET_WIDE: _titlenet_ablation_spec(TITLENET_WIDE, "wide"),
+    TITLENET_SHALLOW: _titlenet_ablation_spec(TITLENET_SHALLOW, "shallow"),
+    TITLENET_DEEPER: _titlenet_ablation_spec(TITLENET_DEEPER, "deeper"),
+    MODEL_TITLENET_FAST_A: _custom_spec(
+        MODEL_TITLENET_FAST_A,
         build_titlenet_fast_a,
     ),
-    "titlenet_fast_b": _custom_spec(
-        "titlenet_fast_b",
+    MODEL_TITLENET_FAST_B: _custom_spec(
+        MODEL_TITLENET_FAST_B,
         build_titlenet_fast_b,
     ),
-    "titlenet_fast_c": _custom_spec(
-        "titlenet_fast_c",
+    MODEL_TITLENET_FAST_C: _custom_spec(
+        MODEL_TITLENET_FAST_C,
         build_titlenet_fast_c,
     ),
-    "simple_cnn_m_res_deeper": _custom_spec(
-        "simple_cnn_m_res_deeper",
+    MODEL_SIMPLE_CNN_M_RES_DEEPER: _custom_spec(
+        MODEL_SIMPLE_CNN_M_RES_DEEPER,
         build_simple_cnn_medium_residual_deeper,
     ),
-    "simple_cnn_m_mask_pool": _custom_spec(
-        "simple_cnn_m_mask_pool",
+    MODEL_SIMPLE_CNN_M_MASK_POOL: _custom_spec(
+        MODEL_SIMPLE_CNN_M_MASK_POOL,
         build_simple_cnn_medium_mask_pool,
     ),
-    "simple_cnn_l": _custom_spec("simple_cnn_l", build_simple_cnn_large),
-    "mask_aware_cnn": _custom_spec("mask_aware_cnn", build_mask_aware_cnn),
-    "mask_aware_cnn_m": _custom_spec(
-        "mask_aware_cnn_m",
+    MODEL_SIMPLE_CNN_L: _custom_spec(MODEL_SIMPLE_CNN_L, build_simple_cnn_large),
+    MODEL_MASK_AWARE_CNN: _custom_spec(MODEL_MASK_AWARE_CNN, build_mask_aware_cnn),
+    MODEL_MASK_AWARE_CNN_M: _custom_spec(
+        MODEL_MASK_AWARE_CNN_M,
         build_mask_aware_cnn_medium,
     ),
-    "mask_aware_palette_net": ModelSpec(
-        name="mask_aware_palette_net",
+    MODEL_MASK_AWARE_PALETTE_NET: ModelSpec(
+        name=MODEL_MASK_AWARE_PALETTE_NET,
         builder=build_mask_aware_palette_net,
     ),
-    "mask_aware_tiny_hybrid_ranker": _custom_spec(
-        "mask_aware_tiny_hybrid_ranker",
+    MODEL_MASK_AWARE_TINY_HYBRID_RANKER: _custom_spec(
+        MODEL_MASK_AWARE_TINY_HYBRID_RANKER,
         build_mask_aware_tiny_hybrid_ranker,
     ),
 }
 MODEL_ALIASES = {
-    "efficientnet-b0": "efficientnet_b0",
-    "convnext-tiny": "convnext_tiny",
-    "vit-tiny": "vit_tiny",
-    "titlehybridtiny": "title_hybrid_tiny",
-    "title-hybrid-tiny": "title_hybrid_tiny",
-    "titleformer-lite": "title_hybrid_tiny",
-    "titleformer_lite": "title_hybrid_tiny",
-    "title_former_lite": "title_hybrid_tiny",
-    "titlehybridfast": "title_hybrid_fast",
-    "title-hybrid-fast": "title_hybrid_fast",
-    "swin-tiny": "swin_tiny",
-    "mlp": "flatten_mlp",
-    "flattenmlp": "flatten_mlp",
-    "simplecnn": "simple_cnn",
-    "simple-cnn": "simple_cnn",
-    "simplecnn-m": "simple_cnn_m",
-    "simplecnn_m": "simple_cnn_m",
-    "simple-cnn-m": "simple_cnn_m",
-    "simplecnn-m-res": "simple_cnn_m_res",
-    "simplecnn_m_res": "simple_cnn_m_res",
-    "simple-cnn-m-res": "simple_cnn_m_res",
-    "simplecnn-m-residual": "simple_cnn_m_res",
-    "simple-cnn-m-residual": "simple_cnn_m_res",
-    "simplecnn-m-res-mask-pool": "simple_cnn_m_res_mask_pool",
-    "simplecnn_m_res_mask_pool": "simple_cnn_m_res_mask_pool",
-    "simple-cnn-m-res-mask-pool": "simple_cnn_m_res_mask_pool",
-    "simplecnn-m-res-se": "simple_cnn_m_res_se",
-    "simplecnn_m_res_se": "simple_cnn_m_res_se",
-    "simple-cnn-m-res-se": "simple_cnn_m_res_se",
-    "title_net": "titlenet",
-    "title-net": "titlenet",
-    "titlenet-fast-a": "titlenet_fast_a",
-    "title-net-fast-a": "titlenet_fast_a",
-    "titlenet-fast-b": "titlenet_fast_b",
-    "title-net-fast-b": "titlenet_fast_b",
-    "titlenet-fast-c": "titlenet_fast_c",
-    "title-net-fast-c": "titlenet_fast_c",
-    "simplecnn-m-res-deeper": "simple_cnn_m_res_deeper",
-    "simplecnn_m_res_deeper": "simple_cnn_m_res_deeper",
-    "simple-cnn-m-res-deeper": "simple_cnn_m_res_deeper",
-    "simplecnn-m-mask-pool": "simple_cnn_m_mask_pool",
-    "simplecnn_m_mask_pool": "simple_cnn_m_mask_pool",
-    "simple-cnn-m-mask-pool": "simple_cnn_m_mask_pool",
-    "simplecnn-l": "simple_cnn_l",
-    "simplecnn_l": "simple_cnn_l",
-    "simple-cnn-l": "simple_cnn_l",
-    "maskawarecnn": "mask_aware_cnn",
-    "maskawarecnn-m": "mask_aware_cnn_m",
-    "maskawarecnn_m": "mask_aware_cnn_m",
-    "mask-aware-cnn-m": "mask_aware_cnn_m",
-    "maskawarepalettenet": "mask_aware_palette_net",
-    "maskawaretinyhybridranker": "mask_aware_tiny_hybrid_ranker",
-    "mask-aware-tiny-hybrid-ranker": "mask_aware_tiny_hybrid_ranker",
-    "mask_aware_tiny_hybrid_color_ranker": "mask_aware_tiny_hybrid_ranker",
-    "mask-aware-tiny-hybrid-color-ranker": "mask_aware_tiny_hybrid_ranker",
-    "tiny-hybrid-color-ranker": "mask_aware_tiny_hybrid_ranker",
-    "tiny_hybrid_color_ranker": "mask_aware_tiny_hybrid_ranker",
+    "efficientnet-b0": MODEL_EFFICIENTNET_B0,
+    "convnext-tiny": MODEL_CONVNEXT_TINY,
+    "vit-tiny": MODEL_VIT_TINY,
+    "titlehybridtiny": MODEL_TITLE_HYBRID_TINY,
+    "title-hybrid-tiny": MODEL_TITLE_HYBRID_TINY,
+    "titleformer-lite": MODEL_TITLE_HYBRID_TINY,
+    "titleformer_lite": MODEL_TITLE_HYBRID_TINY,
+    "title_former_lite": MODEL_TITLE_HYBRID_TINY,
+    "titlehybridfast": MODEL_TITLE_HYBRID_FAST,
+    "title-hybrid-fast": MODEL_TITLE_HYBRID_FAST,
+    "swin-tiny": MODEL_SWIN_TINY,
+    "mlp": MODEL_FLATTEN_MLP,
+    "flattenmlp": MODEL_FLATTEN_MLP,
+    "simplecnn": MODEL_SIMPLE_CNN,
+    "simple-cnn": MODEL_SIMPLE_CNN,
+    "simplecnn-m": MODEL_SIMPLE_CNN_M,
+    "simplecnn_m": MODEL_SIMPLE_CNN_M,
+    "simple-cnn-m": MODEL_SIMPLE_CNN_M,
+    "simplecnn-m-res": MODEL_SIMPLE_CNN_M_RES,
+    "simplecnn_m_res": MODEL_SIMPLE_CNN_M_RES,
+    "simple-cnn-m-res": MODEL_SIMPLE_CNN_M_RES,
+    "simplecnn-m-residual": MODEL_SIMPLE_CNN_M_RES,
+    "simple-cnn-m-residual": MODEL_SIMPLE_CNN_M_RES,
+    "simplecnn-m-res-mask-pool": MODEL_SIMPLE_CNN_M_RES_MASK_POOL,
+    "simplecnn_m_res_mask_pool": MODEL_SIMPLE_CNN_M_RES_MASK_POOL,
+    "simple-cnn-m-res-mask-pool": MODEL_SIMPLE_CNN_M_RES_MASK_POOL,
+    "simplecnn-m-res-se": MODEL_SIMPLE_CNN_M_RES_SE,
+    "simplecnn_m_res_se": MODEL_SIMPLE_CNN_M_RES_SE,
+    "simple-cnn-m-res-se": MODEL_SIMPLE_CNN_M_RES_SE,
+    "title_net": MODEL_TITLENET,
+    "title-net": MODEL_TITLENET,
+    "titlenet-no-se": TITLENET_NO_SE,
+    "title-net-no-se": TITLENET_NO_SE,
+    "titlenet-without-se": TITLENET_NO_SE,
+    "titlenet_without_se": TITLENET_NO_SE,
+    "title-net-without-se": TITLENET_NO_SE,
+    "title_net_without_se": TITLENET_NO_SE,
+    "titlenet-no-residual": TITLENET_NO_RESIDUAL,
+    "titlenet_no_residuals": TITLENET_NO_RESIDUAL,
+    "titlenet-without-residual": TITLENET_NO_RESIDUAL,
+    "titlenet_without_residual": TITLENET_NO_RESIDUAL,
+    "title-net-no-residual": TITLENET_NO_RESIDUAL,
+    "titlenet-no-first-residual": TITLENET_NO_FIRST_RESIDUAL,
+    "titlenet_no_first_residual": TITLENET_NO_FIRST_RESIDUAL,
+    "titlenet-no-stage1-residual": TITLENET_NO_FIRST_RESIDUAL,
+    "titlenet_no_stage1_residual": TITLENET_NO_FIRST_RESIDUAL,
+    "titlenet-no-middle-residual": TITLENET_NO_MIDDLE_RESIDUAL,
+    "titlenet_no_middle_residual": TITLENET_NO_MIDDLE_RESIDUAL,
+    "titlenet-no-stage2-residual": TITLENET_NO_MIDDLE_RESIDUAL,
+    "titlenet_no_stage2_residual": TITLENET_NO_MIDDLE_RESIDUAL,
+    "titlenet-no-last-residual": TITLENET_NO_LAST_RESIDUAL,
+    "titlenet_no_last_residual": TITLENET_NO_LAST_RESIDUAL,
+    "titlenet-no-stage3-residual": TITLENET_NO_LAST_RESIDUAL,
+    "titlenet_no_stage3_residual": TITLENET_NO_LAST_RESIDUAL,
+    "titlenet-no-last-extra-residual": TITLENET_NO_LAST_EXTRA_RESIDUAL,
+    "titlenet_no_last_extra_residual": TITLENET_NO_LAST_EXTRA_RESIDUAL,
+    "titlenet-no-extra-residual": TITLENET_NO_LAST_EXTRA_RESIDUAL,
+    "titlenet_no_extra_residual": TITLENET_NO_LAST_EXTRA_RESIDUAL,
+    "titlenet-no-stem": TITLENET_NO_STEM,
+    "titlenet_without_stem": TITLENET_NO_STEM,
+    "titlenet-without-stem": TITLENET_NO_STEM,
+    "title-net-no-stem": TITLENET_NO_STEM,
+    "titlenet-no-stage1": TITLENET_NO_STAGE1,
+    "titlenet_no_stage1": TITLENET_NO_STAGE1,
+    "titlenet-without-stage1": TITLENET_NO_STAGE1,
+    "titlenet_without_stage1": TITLENET_NO_STAGE1,
+    "titlenet-no-stage-1": TITLENET_NO_STAGE1,
+    "titlenet-no-stage2": TITLENET_NO_STAGE2,
+    "titlenet_no_stage2": TITLENET_NO_STAGE2,
+    "titlenet-without-stage2": TITLENET_NO_STAGE2,
+    "titlenet_without_stage2": TITLENET_NO_STAGE2,
+    "titlenet-no-stage-2": TITLENET_NO_STAGE2,
+    "titlenet-no-stage3": TITLENET_NO_STAGE3,
+    "titlenet_no_stage3": TITLENET_NO_STAGE3,
+    "titlenet-without-stage3": TITLENET_NO_STAGE3,
+    "titlenet_without_stage3": TITLENET_NO_STAGE3,
+    "titlenet-no-stage-3": TITLENET_NO_STAGE3,
+    "titlenet-eca": TITLENET_ECA,
+    "titlenet-with-eca": TITLENET_ECA,
+    "titlenet_with_eca": TITLENET_ECA,
+    "title-net-with-eca": TITLENET_ECA,
+    "title_net_with_eca": TITLENET_ECA,
+    "titlenet-narrow": TITLENET_NARROW,
+    "title-net-narrow": TITLENET_NARROW,
+    "titlenet-wide": TITLENET_WIDE,
+    "title-net-wide": TITLENET_WIDE,
+    "titlenet-shallow": TITLENET_SHALLOW,
+    "title-net-shallow": TITLENET_SHALLOW,
+    "titlenet-deeper": TITLENET_DEEPER,
+    "title-net-deeper": TITLENET_DEEPER,
+    "titlenet-fast-a": MODEL_TITLENET_FAST_A,
+    "title-net-fast-a": MODEL_TITLENET_FAST_A,
+    "titlenet-fast-b": MODEL_TITLENET_FAST_B,
+    "title-net-fast-b": MODEL_TITLENET_FAST_B,
+    "titlenet-fast-c": MODEL_TITLENET_FAST_C,
+    "title-net-fast-c": MODEL_TITLENET_FAST_C,
+    "simplecnn-m-res-deeper": MODEL_SIMPLE_CNN_M_RES_DEEPER,
+    "simplecnn_m_res_deeper": MODEL_SIMPLE_CNN_M_RES_DEEPER,
+    "simple-cnn-m-res-deeper": MODEL_SIMPLE_CNN_M_RES_DEEPER,
+    "simplecnn-m-mask-pool": MODEL_SIMPLE_CNN_M_MASK_POOL,
+    "simplecnn_m_mask_pool": MODEL_SIMPLE_CNN_M_MASK_POOL,
+    "simple-cnn-m-mask-pool": MODEL_SIMPLE_CNN_M_MASK_POOL,
+    "simplecnn-l": MODEL_SIMPLE_CNN_L,
+    "simplecnn_l": MODEL_SIMPLE_CNN_L,
+    "simple-cnn-l": MODEL_SIMPLE_CNN_L,
+    "maskawarecnn": MODEL_MASK_AWARE_CNN,
+    "maskawarecnn-m": MODEL_MASK_AWARE_CNN_M,
+    "maskawarecnn_m": MODEL_MASK_AWARE_CNN_M,
+    "mask-aware-cnn-m": MODEL_MASK_AWARE_CNN_M,
+    "maskawarepalettenet": MODEL_MASK_AWARE_PALETTE_NET,
+    "maskawaretinyhybridranker": MODEL_MASK_AWARE_TINY_HYBRID_RANKER,
+    "mask-aware-tiny-hybrid-ranker": MODEL_MASK_AWARE_TINY_HYBRID_RANKER,
+    "mask_aware_tiny_hybrid_color_ranker": MODEL_MASK_AWARE_TINY_HYBRID_RANKER,
+    "mask-aware-tiny-hybrid-color-ranker": MODEL_MASK_AWARE_TINY_HYBRID_RANKER,
+    "tiny-hybrid-color-ranker": MODEL_MASK_AWARE_TINY_HYBRID_RANKER,
+    "tiny_hybrid_color_ranker": MODEL_MASK_AWARE_TINY_HYBRID_RANKER,
 }
 
 
