@@ -1,0 +1,88 @@
+base:
+  activation: gelu
+  weight_init: small_head
+  dropout: 0.2
+  learning_rate: 0.0005
+  weight_decay: 0.0001
+
+training:
+  batch_size: 64
+  epochs: 20
+  scheduler: cosine
+  best_metric: val_ndcg@5
+  num_workers: 4
+  device: cuda
+  seed: 42
+
+latency:
+  warmup_steps: 10
+  benchmark_steps: 50
+
+output:
+  checkpoint_root: outputs/checkpoints/titlenet_ablation
+  log_root: outputs/logs/titlenet_ablation
+  report_root: outputs/reports/titlenet_ablation
+  results_csv: outputs/reports/titlenet_ablation_results.csv
+  report_path: outputs/reports/titlenet_ablation_report.md
+  ndcg_plot_path: outputs/reports/titlenet_ablation_ndcg_curve.png
+  ndcg_delta_plot_path: outputs/reports/titlenet_ablation_ndcg5_delta.png
+  paper_summary_plot_path: outputs/reports/titlenet_ablation_paper_summary.png
+  residual_paper_plot_path: outputs/reports/titlenet_residual_ablation_paper_summary.png
+  stage_paper_plot_path: outputs/reports/titlenet_stage_ablation_paper_summary.png
+  latency_plot_path: outputs/reports/titlenet_ablation_latency.png
+
+trials:
+  - name: titlenet
+    group: reference
+    model_name: titlenet
+    description: Final TitLeNet reference model.
+
+  - name: titlenet_no_stem
+    group: stage_deletion
+    model_name: titlenet_no_stem
+    description: Replace the 3x3 stem with a 1x1 projection.
+
+  - name: titlenet_no_stage1
+    group: stage_deletion
+    model_name: titlenet_no_stage1
+    description: Replace Stage 1 with a stride-2 1x1 projection.
+
+  - name: titlenet_no_stage2
+    group: stage_deletion
+    model_name: titlenet_no_stage2
+    description: Replace Stage 2 with a stride-2 1x1 projection.
+
+  - name: titlenet_no_stage3
+    group: stage_deletion
+    model_name: titlenet_no_stage3
+    description: Replace Stage 3 with a stride-2 1x1 projection.
+
+  - name: titlenet_no_se
+    group: deletion
+    model_name: titlenet_no_se
+    description: Remove SE attention from every residual block.
+
+  - name: titlenet_no_residual
+    group: deletion
+    model_name: titlenet_no_residual
+    description: Remove all residual blocks after downsampling layers.
+
+  - name: titlenet_no_first_residual
+    group: deletion
+    model_name: titlenet_no_first_residual
+    description: Remove the residual block from the first downsample stage.
+
+  - name: titlenet_no_middle_residual
+    group: deletion
+    model_name: titlenet_no_middle_residual
+    description: Remove the residual block from the middle downsample stage.
+
+  - name: titlenet_no_last_residual
+    group: deletion
+    model_name: titlenet_no_last_residual
+    description: Remove both residual blocks from the final downsample stage.
+
+  - name: titlenet_no_last_extra_residual
+    group: deletion
+    model_name: titlenet_no_last_extra_residual
+    description: Remove only the extra residual block from the final stage.
