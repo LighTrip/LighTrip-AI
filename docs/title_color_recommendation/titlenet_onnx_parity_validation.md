@@ -30,6 +30,8 @@ TitLeNet ONNX export 이후 실제 전처리된 ROI/mask 샘플 기준으로 PyT
 | max_abs_diff threshold | `1e-4` |
 | mean_abs_diff threshold | `1e-5` |
 
+샘플은 보안용 난수나 PRNG를 사용하지 않고, `seed:index`의 SHA-256 digest 기준으로 결정적으로 선택한다.
+
 ## 산출물
 
 ```text
@@ -58,7 +60,7 @@ outputs/reports/model_evaluation/onnx/titlenet_onnx_parity_metrics.json
 | top1_agreement | `100.00%` | `100.00%` |
 | top3_agreement | `100.00%` | - |
 | top5_agreement | `100.00%` | - |
-| max_abs_diff | `1.9073486e-06` | `1e-4` |
-| mean_abs_diff | `2.4316832e-07` | `1e-5` |
+| max_abs_diff | `3.3378601e-06` | `1e-4` |
+| mean_abs_diff | `2.4808156e-07` | `1e-5` |
 
 결과: pass.

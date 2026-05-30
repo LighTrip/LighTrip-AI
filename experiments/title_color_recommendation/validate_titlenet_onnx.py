@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
-import random
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -146,9 +146,11 @@ def selected_indices(*, dataset_size: int, sample_count: int, seed: int) -> list
     if sample_count <= 0:
         raise ValueError(f"sample-count must be positive: {sample_count}")
     count = min(sample_count, dataset_size)
-    indices = list(range(dataset_size))
-    random.Random(seed).shuffle(indices)
-    return sorted(indices[:count])
+    ranked_indices = sorted(
+        range(dataset_size),
+        key=lambda index: hashlib.sha256(f"{seed}:{index}".encode("utf-8")).digest(),
+    )
+    return sorted(ranked_indices[:count])
 
 
 def topk_indices(values: np.ndarray, *, k: int) -> list[int]:
