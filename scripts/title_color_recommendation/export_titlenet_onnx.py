@@ -1,0 +1,486 @@
+from __future__ import annotations
+
+import argparse
+import inspect
+import json
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Mapping
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_CHECKPOINT = Path("outputs/checkpoints/titlenet_ndcg3_eval/checkpoint_best.pt")
+DEFAULT_OUTPUT_DIR = Path("outputs/title_color_recommendation/onnx")
+DEFAULT_LOGITS_FILENAME = "titlenet_logits.onnx"
+DEFAULT_TOP1_FILENAME = "titlenet_top1.onnx"
+DEFAULT_MODEL_NAME = "titlenet"
+DEFAULT_NUM_CLASSES = 32
+DEFAULT_DROPOUT = 0.2
+DEFAULT_WEIGHT_INIT = "small_head"
+DEFAULT_ACTIVATION = "gelu"
+DEFAULT_OPSET = 17
+DEFAULT_INPUT_SHAPE = (1, 4, 36, 136)
+LOGITS_OUTPUT_NAME = "logits"
+TOP1_OUTPUT_NAME = "top1_index"
+
+
+@dataclass(frozen=True)
+class ExportPaths:
+    output_dir: Path
+    logits_output: Path
+    top1_output: Path
+
+
+@dataclass(frozen=True)
+class ModelExportConfig:
+    model_name: str
+    num_classes: int
+    dropout: float
+    weight_init: str
+    activation: str
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Export a trained TitLeNet checkpoint to ONNX."
+    )
+    parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
+    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument("--logits-output", type=Path, default=None)
+    parser.add_argument("--top1-output", type=Path, default=None)
+    parser.add_argument("--model-name", default=None)
+    parser.add_argument("--dropout", type=float, default=None)
+    parser.add_argument("--weight-init", default=None)
+    parser.add_argument("--activation", default=None)
+    parser.add_argument("--opset", type=int, default=DEFAULT_OPSET)
+    parser.add_argument("--skip-onnx-check", action="store_true")
+    parser.add_argument("--skip-onnxruntime-check", action="store_true")
+    return parser.parse_args(argv)
+
+
+def ensure_project_imports() -> None:
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+
+
+def project_path(path: Path) -> Path:
+    return path if path.is_absolute() else PROJECT_ROOT / path
+
+
+def display_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(PROJECT_ROOT))
+    except ValueError:
+        return str(path)
+
+
+def export_paths(
+    *,
+    output_dir: Path,
+    logits_output: Path | None,
+    top1_output: Path | None,
+) -> ExportPaths:
+    resolved_output_dir = project_path(output_dir)
+    return ExportPaths(
+        output_dir=resolved_output_dir,
+        logits_output=project_path(logits_output)
+        if logits_output is not None
+        else resolved_output_dir / DEFAULT_LOGITS_FILENAME,
+        top1_output=project_path(top1_output)
+        if top1_output is not None
+        else resolved_output_dir / DEFAULT_TOP1_FILENAME,
+    )
+
+
+def load_checkpoint(checkpoint_path: Path, torch_module: Any) -> Mapping[str, Any]:
+    load_kwargs: dict[str, Any] = {"map_location": "cpu"}
+    if "weights_only" in inspect.signature(torch_module.load).parameters:
+        load_kwargs["weights_only"] = True
+
+    checkpoint = torch_module.load(checkpoint_path, **load_kwargs)
+
+    if not isinstance(checkpoint, Mapping):
+        raise TypeError(f"checkpoint must be a mapping: {checkpoint_path}")
+    if "model_state_dict" not in checkpoint:
+        raise KeyError(f"checkpoint missing model_state_dict: {checkpoint_path}")
+    return checkpoint
+
+
+def model_config_from_checkpoint(
+    checkpoint: Mapping[str, Any],
+    *,
+    model_name: str | None,
+    dropout: float | None,
+    weight_init: str | None,
+    activation: str | None,
+) -> ModelExportConfig:
+    raw_config = checkpoint.get("config") or {}
+    if not isinstance(raw_config, Mapping):
+        raw_config = {}
+
+    return ModelExportConfig(
+        model_name=str(model_name or raw_config.get("model_name") or DEFAULT_MODEL_NAME),
+        num_classes=int(raw_config.get("num_classes") or DEFAULT_NUM_CLASSES),
+        dropout=float(
+            dropout if dropout is not None else raw_config.get("dropout", DEFAULT_DROPOUT)
+        ),
+        weight_init=str(weight_init or raw_config.get("weight_init") or DEFAULT_WEIGHT_INIT),
+        activation=str(activation or raw_config.get("activation") or DEFAULT_ACTIVATION),
+    )
+
+
+def build_model(checkpoint: Mapping[str, Any], config: ModelExportConfig) -> Any:
+    ensure_project_imports()
+    from src.models.title_color_model_registry import build_title_color_model
+
+    model = build_title_color_model(
+        config.model_name,
+        num_classes=config.num_classes,
+        pretrained=False,
+        dropout=config.dropout,
+        weight_init=config.weight_init,
+        activation=config.activation,
+    )
+    state_dict = checkpoint["model_state_dict"]
+    if not isinstance(state_dict, Mapping):
+        raise TypeError("checkpoint model_state_dict must be a mapping")
+    model.load_state_dict(state_dict)
+    model.eval()
+    return model
+
+
+def make_top1_wrapper(model: Any, torch_module: Any) -> Any:
+    class TitLeNetTop1Wrapper(torch_module.nn.Module):
+        def __init__(self, wrapped_model: Any) -> None:
+            super().__init__()
+            self.wrapped_model = wrapped_model
+
+        def forward(self, x: Any) -> Any:
+            logits = self.wrapped_model(x)
+            return torch_module.argmax(logits, dim=1)
+
+    wrapper = TitLeNetTop1Wrapper(model)
+    wrapper.eval()
+    return wrapper
+
+
+def validate_torch_outputs(
+    *,
+    logits_model: Any,
+    top1_model: Any,
+    dummy_input: Any,
+    num_classes: int,
+    torch_module: Any,
+) -> dict[str, Any]:
+    with torch_module.no_grad():
+        logits = logits_model(dummy_input)
+        top1 = top1_model(dummy_input)
+
+    expected_logits_shape = (DEFAULT_INPUT_SHAPE[0], num_classes)
+    if tuple(logits.shape) != expected_logits_shape:
+        raise ValueError(
+            f"logits output shape mismatch: expected={expected_logits_shape}, "
+            f"actual={tuple(logits.shape)}"
+        )
+    if tuple(top1.shape) != (DEFAULT_INPUT_SHAPE[0],):
+        raise ValueError(
+            f"top1 output shape mismatch: expected={(DEFAULT_INPUT_SHAPE[0],)}, "
+            f"actual={tuple(top1.shape)}"
+        )
+    if top1.dtype != torch_module.long:
+        raise TypeError(f"top1 output dtype must be int64/torch.long: actual={top1.dtype}")
+
+    top1_index = int(top1[0].item())
+    if not 0 <= top1_index < num_classes:
+        raise ValueError(f"top1 index out of palette range: {top1_index}")
+
+    return {
+        "logits_shape": list(logits.shape),
+        "top1_shape": list(top1.shape),
+        "top1_dtype": str(top1.dtype),
+        "top1_index": top1_index,
+    }
+
+
+def export_onnx_model(
+    *,
+    model: Any,
+    dummy_input: Any,
+    output_path: Path,
+    output_name: str,
+    opset: int,
+    torch_module: Any,
+) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    torch_module.onnx.export(
+        model,
+        dummy_input,
+        output_path,
+        input_names=["input"],
+        output_names=[output_name],
+        opset_version=opset,
+        do_constant_folding=True,
+    )
+    if not output_path.exists() or output_path.stat().st_size <= 0:
+        raise RuntimeError(f"ONNX export did not create a non-empty file: {output_path}")
+
+
+def check_onnx_file(
+    path: Path,
+    *,
+    expected_output_name: str,
+    expected_shape: list[int],
+    expected_dtype: str,
+    required: bool,
+) -> dict[str, Any]:
+    try:
+        import onnx
+    except ModuleNotFoundError:
+        if required:
+            raise
+        return {"path": str(path), "checked": False, "reason": "onnx package is not installed"}
+
+    model = onnx.load(str(path))
+    onnx.checker.check_model(model)
+    outputs = {output.name: output for output in model.graph.output}
+    if expected_output_name not in outputs:
+        raise ValueError(
+            f"ONNX output name mismatch for {path}: expected={expected_output_name!r}, "
+            f"actual={sorted(outputs)}"
+        )
+    shape = [
+        dimension.dim_value
+        for dimension in outputs[expected_output_name].type.tensor_type.shape.dim
+    ]
+    if shape != expected_shape:
+        raise ValueError(
+            f"ONNX output shape mismatch for {path}: expected={expected_shape}, "
+            f"actual={shape}"
+        )
+    elem_type = outputs[expected_output_name].type.tensor_type.elem_type
+    dtype_name = onnx.TensorProto.DataType.Name(elem_type).lower()
+    if dtype_name != expected_dtype:
+        raise TypeError(
+            f"ONNX output dtype mismatch for {path}: expected={expected_dtype}, "
+            f"actual={dtype_name}"
+        )
+    return {
+        "path": str(path),
+        "checked": True,
+        "output_name": expected_output_name,
+        "shape": shape,
+        "dtype": dtype_name,
+    }
+
+
+def run_onnxruntime_check(
+    *,
+    paths: ExportPaths,
+    dummy_input: Any,
+    num_classes: int,
+    required: bool,
+) -> dict[str, Any]:
+    try:
+        import numpy as np
+        import onnxruntime as ort
+    except ModuleNotFoundError:
+        if required:
+            raise
+        return {"checked": False, "reason": "onnxruntime package is not installed"}
+
+    input_array = dummy_input.detach().cpu().numpy().astype(np.float32)
+    logits_session = ort.InferenceSession(
+        str(paths.logits_output),
+        providers=["CPUExecutionProvider"],
+    )
+    top1_session = ort.InferenceSession(
+        str(paths.top1_output),
+        providers=["CPUExecutionProvider"],
+    )
+    logits_output = logits_session.run([LOGITS_OUTPUT_NAME], {"input": input_array})[0]
+    top1_output = top1_session.run([TOP1_OUTPUT_NAME], {"input": input_array})[0]
+
+    if list(logits_output.shape) != [1, num_classes]:
+        raise ValueError(
+            "ONNX Runtime logits output shape mismatch: "
+            f"expected={[1, num_classes]}, actual={list(logits_output.shape)}"
+        )
+    if list(top1_output.shape) != [1]:
+        raise ValueError(
+            "ONNX Runtime top1 output shape mismatch: "
+            f"expected={[1]}, actual={list(top1_output.shape)}"
+        )
+    if top1_output.dtype != np.int64:
+        raise TypeError(f"ONNX Runtime top1 dtype must be int64: actual={top1_output.dtype}")
+
+    top1_index = int(top1_output[0])
+    expected_top1 = int(np.argmax(logits_output, axis=1)[0])
+    if top1_index != expected_top1:
+        raise ValueError(
+            f"ONNX Runtime top1 mismatch: expected={expected_top1}, actual={top1_index}"
+        )
+    if not 0 <= top1_index < num_classes:
+        raise ValueError(f"ONNX Runtime top1 index out of palette range: {top1_index}")
+
+    return {
+        "checked": True,
+        "logits_shape": list(logits_output.shape),
+        "top1_shape": list(top1_output.shape),
+        "top1_dtype": str(top1_output.dtype),
+        "top1_index": top1_index,
+    }
+
+
+def write_export_summary(
+    *,
+    paths: ExportPaths,
+    checkpoint_path: Path,
+    config: ModelExportConfig,
+    opset: int,
+    torch_validation: Mapping[str, Any],
+    onnx_checks: list[Mapping[str, Any]],
+    onnxruntime_check: Mapping[str, Any],
+) -> Path:
+    summary_path = paths.output_dir / "titlenet_onnx_export_summary.json"
+    payload = {
+        "checkpoint": display_path(checkpoint_path),
+        "model": {
+            "name": config.model_name,
+            "num_classes": config.num_classes,
+            "dropout": config.dropout,
+            "weight_init": config.weight_init,
+            "activation": config.activation,
+        },
+        "opset": opset,
+        "input": {
+            "name": "input",
+            "shape": list(DEFAULT_INPUT_SHAPE),
+            "dtype": "float32",
+        },
+        "outputs": {
+            "logits": {
+                "path": display_path(paths.logits_output),
+                "name": LOGITS_OUTPUT_NAME,
+                "shape": [1, config.num_classes],
+                "dtype": "float32",
+            },
+            "top1": {
+                "path": display_path(paths.top1_output),
+                "name": TOP1_OUTPUT_NAME,
+                "shape": [1],
+                "dtype": "int64",
+            },
+        },
+        "torch_validation": dict(torch_validation),
+        "onnx_checks": [dict(check) for check in onnx_checks],
+        "onnxruntime_check": dict(onnxruntime_check),
+    }
+    summary_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return summary_path
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    ensure_project_imports()
+
+    try:
+        import torch
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "PyTorch is required for TitLeNet ONNX export. "
+            "Run this script in the title color training environment."
+        ) from exc
+
+    checkpoint_path = project_path(args.checkpoint)
+    if not checkpoint_path.exists():
+        raise FileNotFoundError(f"checkpoint not found: {checkpoint_path}")
+
+    paths = export_paths(
+        output_dir=args.output_dir,
+        logits_output=args.logits_output,
+        top1_output=args.top1_output,
+    )
+    checkpoint = load_checkpoint(checkpoint_path, torch)
+    config = model_config_from_checkpoint(
+        checkpoint,
+        model_name=args.model_name,
+        dropout=args.dropout,
+        weight_init=args.weight_init,
+        activation=args.activation,
+    )
+    model = build_model(checkpoint, config)
+    top1_model = make_top1_wrapper(model, torch)
+
+    dummy_input = torch.randn(*DEFAULT_INPUT_SHAPE, dtype=torch.float32)
+    torch_validation = validate_torch_outputs(
+        logits_model=model,
+        top1_model=top1_model,
+        dummy_input=dummy_input,
+        num_classes=config.num_classes,
+        torch_module=torch,
+    )
+
+    export_onnx_model(
+        model=model,
+        dummy_input=dummy_input,
+        output_path=paths.logits_output,
+        output_name=LOGITS_OUTPUT_NAME,
+        opset=args.opset,
+        torch_module=torch,
+    )
+    export_onnx_model(
+        model=top1_model,
+        dummy_input=dummy_input,
+        output_path=paths.top1_output,
+        output_name=TOP1_OUTPUT_NAME,
+        opset=args.opset,
+        torch_module=torch,
+    )
+
+    onnx_checks = [
+        check_onnx_file(
+            paths.logits_output,
+            expected_output_name=LOGITS_OUTPUT_NAME,
+            expected_shape=[1, config.num_classes],
+            expected_dtype="float",
+            required=not args.skip_onnx_check,
+        ),
+        check_onnx_file(
+            paths.top1_output,
+            expected_output_name=TOP1_OUTPUT_NAME,
+            expected_shape=[1],
+            expected_dtype="int64",
+            required=not args.skip_onnx_check,
+        ),
+    ]
+    onnxruntime_check = run_onnxruntime_check(
+        paths=paths,
+        dummy_input=dummy_input,
+        num_classes=config.num_classes,
+        required=not args.skip_onnxruntime_check,
+    )
+    summary_path = write_export_summary(
+        paths=paths,
+        checkpoint_path=checkpoint_path,
+        config=config,
+        opset=args.opset,
+        torch_validation=torch_validation,
+        onnx_checks=onnx_checks,
+        onnxruntime_check=onnxruntime_check,
+    )
+
+    print(f"Exported logits ONNX: {paths.logits_output}")
+    print(f"Exported top1 ONNX: {paths.top1_output}")
+    print(f"Wrote export summary: {summary_path}")
+    print(f"Dummy top1 index: {torch_validation['top1_index']}")
+    if onnxruntime_check["checked"]:
+        print(f"ONNX Runtime top1 index: {onnxruntime_check['top1_index']}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

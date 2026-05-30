@@ -43,13 +43,25 @@
       "std": null
     }
   },
-  "model_output": {
-    "shape": [1, 32],
-    "dtype": "float32",
-    "type": "logits",
-    "postprocess": "argmax",
-    "return": "top1",
-    "tie_break": "lowest_index"
+  "model_outputs": {
+    "logits": {
+      "filename": "titlenet_logits.onnx",
+      "shape": [1, 32],
+      "dtype": "float32",
+      "type": "logits",
+      "purpose": "validation"
+    },
+    "top1": {
+      "filename": "titlenet_top1.onnx",
+      "shape": [1],
+      "dtype": "int64",
+      "type": "palette_index",
+      "postprocess": "argmax",
+      "argmax_dim": 1,
+      "return": "top1",
+      "tie_break": "lowest_index",
+      "purpose": "deployment"
+    }
   },
   "palette": {
     "path": "data/title_color_recommendation/processed/palette.json",
