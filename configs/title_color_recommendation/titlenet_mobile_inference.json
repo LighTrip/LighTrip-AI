@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.0",
+  "model": {
+    "name": "titlenet",
+    "task": "title_color_top1",
+    "format": "onnx",
+    "recommended_opset": 17
+  },
+  "source_config": {
+    "path": "configs/title_color_recommendation/default.yaml"
+  },
+  "input_size": {
+    "width": 150,
+    "height": 200
+  },
+  "roi": {
+    "relative": {
+      "x1": 0.05,
+      "y1": 0.18,
+      "x2": 0.95,
+      "y2": 0.36
+    },
+    "pixel": {
+      "x": 7,
+      "y": 36,
+      "width": 136,
+      "height": 36,
+      "box": [7, 36, 143, 72]
+    }
+  },
+  "model_input": {
+    "shape": [1, 4, 36, 136],
+    "layout": "NCHW",
+    "dtype": "float32",
+    "batch_size": 1,
+    "channel_order": ["R", "G", "B", "mask"],
+    "rgb_range": [0.0, 1.0],
+    "mask_range": [0.0, 1.0],
+    "normalization": {
+      "type": "scale_only",
+      "rgb_scale": 255.0,
+      "mean": null,
+      "std": null
+    }
+  },
+  "model_output": {
+    "shape": [1, 32],
+    "dtype": "float32",
+    "type": "logits",
+    "postprocess": "argmax",
+    "return": "top1",
+    "tie_break": "lowest_index"
+  },
+  "palette": {
+    "path": "data/title_color_recommendation/processed/palette.json",
+    "num_colors": 32,
+    "index_field": "id",
+    "return_fields": ["color_index", "hex"]
+  }
+}
