@@ -72,15 +72,26 @@ TitLeNet 모델 입력은 전처리된 title ROI RGB와 text mask를 결합한 4
 
 ## 출력 스펙
 
-모델 출력은 32개 palette 색상에 대한 raw score/logit이다.
+ONNX export 산출물은 검증용 logits 모델과 배포용 top-1 모델로 나눈다.
+
+검증용 logits 모델:
 
 | 항목 | 값 |
 | --- | --- |
+| 파일명 | `titlenet_logits.onnx` |
 | shape | `[1, 32]` |
 | dtype | `float32` |
 | 의미 | palette color별 score/logit |
-| 후처리 | `argmax` |
-| 최종 반환 | top-1 color index |
+
+배포용 top-1 모델:
+
+| 항목 | 값 |
+| --- | --- |
+| 파일명 | `titlenet_top1.onnx` |
+| shape | `[1]` |
+| dtype | `int64` |
+| 내부 후처리 | `argmax(logits, dim=1)` |
+| 의미 | top-1 palette color index |
 
 후처리는 다음 기준으로 고정한다.
 
@@ -89,7 +100,7 @@ logits = model(input)
 top1_index = argmax(logits[0])
 ```
 
-top-1 선택에는 softmax가 필요하지 않다. confidence 표시가 필요한 실험에서는 softmax 확률을 추가 계산할 수 있지만, 최종 색상 선택 기준은 항상 raw logits의 `argmax`이다.
+top-1 선택에는 softmax가 필요하지 않다. confidence 표시가 필요한 실험에서는 logits 모델 출력으로 softmax 확률을 추가 계산할 수 있지만, 최종 색상 선택 기준은 항상 raw logits의 `argmax`이다.
 
 동점이 발생하면 가장 작은 index를 선택한다.
 
@@ -136,7 +147,8 @@ data/title_color_recommendation/processed/palette.json
 | `roi.relative` | 상대 ROI 좌표 |
 | `roi.pixel` | 고정 픽셀 ROI 좌표 |
 | `model_input` | 입력 shape, dtype, layout, channel order |
-| `model_output` | 출력 shape, dtype, 후처리 |
+| `model_outputs.logits` | 검증용 logits ONNX 출력 shape와 dtype |
+| `model_outputs.top1` | 배포용 top-1 ONNX 출력 shape, dtype, 후처리 |
 | `palette` | palette 파일 경로와 index 매핑 기준 |
 
 참조 파일:
@@ -150,6 +162,8 @@ configs/title_color_recommendation/titlenet_mobile_inference.json
 후속 ONNX export와 검증 작업에서는 이 스펙을 기준으로 다음을 확인한다.
 
 - 입력 tensor shape가 `[1, 4, 36, 136]`인지 확인한다.
-- 출력 tensor shape가 `[1, 32]`인지 확인한다.
+- logits 모델 출력 tensor shape가 `[1, 32]`인지 확인한다.
+- top-1 모델 출력 tensor shape가 `[1]`인지 확인한다.
+- top-1 모델 출력 dtype이 `int64`인지 확인한다.
 - PyTorch와 변환 모델의 `top1_index`가 일치하는지 확인한다.
 - `top1_index`가 `palette.json`의 `id`와 올바르게 매핑되는지 확인한다.
