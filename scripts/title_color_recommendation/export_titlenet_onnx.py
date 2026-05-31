@@ -43,6 +43,19 @@ class ModelExportConfig:
     activation: str
 
 
+@dataclass(frozen=True)
+class OnnxExportResult:
+    paths: ExportPaths
+    checkpoint_path: Path
+    config: ModelExportConfig
+    model: Any
+    top1_model: Any
+    torch_validation: Mapping[str, Any]
+    onnx_checks: list[Mapping[str, Any]]
+    onnxruntime_check: Mapping[str, Any]
+    summary_path: Path
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Export a trained TitLeNet checkpoint to ONNX."
@@ -307,14 +320,7 @@ def run_onnxruntime_check(
         return {"checked": False, "reason": "onnxruntime package is not installed"}
 
     input_array = dummy_input.detach().cpu().numpy().astype(np.float32)
-    logits_session = ort.InferenceSession(
-        str(paths.logits_output),
-        providers=["CPUExecutionProvider"],
-    )
-    top1_session = ort.InferenceSession(
-        str(paths.top1_output),
-        providers=["CPUExecutionProvider"],
-    )
+    logits_session, top1_session = make_onnxruntime_sessions(paths, ort)
     logits_output = logits_session.run([LOGITS_OUTPUT_NAME], {"input": input_array})[0]
     top1_output = top1_session.run([TOP1_OUTPUT_NAME], {"input": input_array})[0]
 
@@ -347,6 +353,18 @@ def run_onnxruntime_check(
         "top1_dtype": str(top1_output.dtype),
         "top1_index": top1_index,
     }
+
+
+def make_onnxruntime_sessions(paths: ExportPaths, ort_module: Any) -> tuple[Any, Any]:
+    logits_session = ort_module.InferenceSession(
+        str(paths.logits_output),
+        providers=["CPUExecutionProvider"],
+    )
+    top1_session = ort_module.InferenceSession(
+        str(paths.top1_output),
+        providers=["CPUExecutionProvider"],
+    )
+    return logits_session, top1_session
 
 
 def write_export_summary(
@@ -401,6 +419,118 @@ def write_export_summary(
     return summary_path
 
 
+def export_checkpoint_to_onnx(
+    *,
+    checkpoint_path: Path,
+    paths: ExportPaths,
+    model_name: str | None,
+    dropout: float | None,
+    weight_init: str | None,
+    activation: str | None,
+    opset: int,
+    require_onnx_check: bool,
+    require_onnxruntime_check: bool,
+    torch_module: Any,
+) -> OnnxExportResult:
+    checkpoint = load_checkpoint(checkpoint_path, torch_module)
+    config = model_config_from_checkpoint(
+        checkpoint,
+        model_name=model_name,
+        dropout=dropout,
+        weight_init=weight_init,
+        activation=activation,
+    )
+    model = build_model(checkpoint, config)
+    top1_model = make_top1_wrapper(model, torch_module)
+    dummy_input = torch_module.randn(*DEFAULT_INPUT_SHAPE, dtype=torch_module.float32)
+    torch_validation = validate_torch_outputs(
+        logits_model=model,
+        top1_model=top1_model,
+        dummy_input=dummy_input,
+        num_classes=config.num_classes,
+        torch_module=torch_module,
+    )
+    export_onnx_model(
+        model=model,
+        dummy_input=dummy_input,
+        output_path=paths.logits_output,
+        output_name=LOGITS_OUTPUT_NAME,
+        opset=opset,
+        torch_module=torch_module,
+    )
+    export_onnx_model(
+        model=top1_model,
+        dummy_input=dummy_input,
+        output_path=paths.top1_output,
+        output_name=TOP1_OUTPUT_NAME,
+        opset=opset,
+        torch_module=torch_module,
+    )
+    onnx_checks = [
+        check_onnx_file(
+            paths.logits_output,
+            expected_output_name=LOGITS_OUTPUT_NAME,
+            expected_shape=[1, config.num_classes],
+            expected_dtype="float",
+            required=require_onnx_check,
+        ),
+        check_onnx_file(
+            paths.top1_output,
+            expected_output_name=TOP1_OUTPUT_NAME,
+            expected_shape=[1],
+            expected_dtype="int64",
+            required=require_onnx_check,
+        ),
+    ]
+    onnxruntime_check = run_onnxruntime_check(
+        paths=paths,
+        dummy_input=dummy_input,
+        num_classes=config.num_classes,
+        required=require_onnxruntime_check,
+    )
+    summary_path = write_export_summary(
+        paths=paths,
+        checkpoint_path=checkpoint_path,
+        config=config,
+        opset=opset,
+        torch_validation=torch_validation,
+        onnx_checks=onnx_checks,
+        onnxruntime_check=onnxruntime_check,
+    )
+    return OnnxExportResult(
+        paths=paths,
+        checkpoint_path=checkpoint_path,
+        config=config,
+        model=model,
+        top1_model=top1_model,
+        torch_validation=torch_validation,
+        onnx_checks=onnx_checks,
+        onnxruntime_check=onnxruntime_check,
+        summary_path=summary_path,
+    )
+
+
+def export_checkpoint_from_args(
+    *,
+    args: argparse.Namespace,
+    checkpoint_path: Path,
+    paths: ExportPaths,
+    torch_module: Any,
+) -> OnnxExportResult:
+    return export_checkpoint_to_onnx(
+        checkpoint_path=checkpoint_path,
+        paths=paths,
+        model_name=args.model_name,
+        dropout=args.dropout,
+        weight_init=args.weight_init,
+        activation=args.activation,
+        opset=args.opset,
+        require_onnx_check=not args.skip_onnx_check,
+        require_onnxruntime_check=not args.skip_onnxruntime_check,
+        torch_module=torch_module,
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     ensure_project_imports()
@@ -423,81 +553,19 @@ def main(argv: list[str] | None = None) -> int:
         top1_output=args.top1_output,
         summary_output=args.summary_output,
     )
-    checkpoint = load_checkpoint(checkpoint_path, torch)
-    config = model_config_from_checkpoint(
-        checkpoint,
-        model_name=args.model_name,
-        dropout=args.dropout,
-        weight_init=args.weight_init,
-        activation=args.activation,
-    )
-    model = build_model(checkpoint, config)
-    top1_model = make_top1_wrapper(model, torch)
-
-    dummy_input = torch.randn(*DEFAULT_INPUT_SHAPE, dtype=torch.float32)
-    torch_validation = validate_torch_outputs(
-        logits_model=model,
-        top1_model=top1_model,
-        dummy_input=dummy_input,
-        num_classes=config.num_classes,
-        torch_module=torch,
-    )
-
-    export_onnx_model(
-        model=model,
-        dummy_input=dummy_input,
-        output_path=paths.logits_output,
-        output_name=LOGITS_OUTPUT_NAME,
-        opset=args.opset,
-        torch_module=torch,
-    )
-    export_onnx_model(
-        model=top1_model,
-        dummy_input=dummy_input,
-        output_path=paths.top1_output,
-        output_name=TOP1_OUTPUT_NAME,
-        opset=args.opset,
-        torch_module=torch,
-    )
-
-    onnx_checks = [
-        check_onnx_file(
-            paths.logits_output,
-            expected_output_name=LOGITS_OUTPUT_NAME,
-            expected_shape=[1, config.num_classes],
-            expected_dtype="float",
-            required=not args.skip_onnx_check,
-        ),
-        check_onnx_file(
-            paths.top1_output,
-            expected_output_name=TOP1_OUTPUT_NAME,
-            expected_shape=[1],
-            expected_dtype="int64",
-            required=not args.skip_onnx_check,
-        ),
-    ]
-    onnxruntime_check = run_onnxruntime_check(
-        paths=paths,
-        dummy_input=dummy_input,
-        num_classes=config.num_classes,
-        required=not args.skip_onnxruntime_check,
-    )
-    summary_path = write_export_summary(
-        paths=paths,
+    result = export_checkpoint_from_args(
+        args=args,
         checkpoint_path=checkpoint_path,
-        config=config,
-        opset=args.opset,
-        torch_validation=torch_validation,
-        onnx_checks=onnx_checks,
-        onnxruntime_check=onnxruntime_check,
+        paths=paths,
+        torch_module=torch,
     )
 
     print(f"Exported logits ONNX: {paths.logits_output}")
     print(f"Exported top1 ONNX: {paths.top1_output}")
-    print(f"Wrote export summary: {summary_path}")
-    print(f"Dummy top1 index: {torch_validation['top1_index']}")
-    if onnxruntime_check["checked"]:
-        print(f"ONNX Runtime top1 index: {onnxruntime_check['top1_index']}")
+    print(f"Wrote export summary: {result.summary_path}")
+    print(f"Dummy top1 index: {result.torch_validation['top1_index']}")
+    if result.onnxruntime_check["checked"]:
+        print(f"ONNX Runtime top1 index: {result.onnxruntime_check['top1_index']}")
     return 0
 
 

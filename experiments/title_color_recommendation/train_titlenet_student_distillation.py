@@ -133,10 +133,7 @@ class StudentDistillationResult:
     metrics_payload: dict[str, Any]
 
 
-def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Train an ablation-guided TitLeNet student with distillation."
-    )
+def add_distillation_training_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--data-root", type=Path, default=None)
     parser.add_argument("--labels-matrix", type=Path, default=None)
@@ -155,6 +152,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--temperature", type=float, default=None)
     parser.add_argument("--base-loss-weight", type=float, default=None)
     parser.add_argument("--distillation-loss-weight", type=float, default=None)
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Train an ablation-guided TitLeNet student with distillation."
+    )
+    add_distillation_training_args(parser)
     parser.add_argument("--checkpoint-dir", type=Path, default=None)
     parser.add_argument("--log-path", type=Path, default=None)
     parser.add_argument("--report-path", type=Path, default=None)
@@ -579,6 +583,29 @@ def _clone_model_state(model: nn.Module) -> dict[str, Tensor]:
     }
 
 
+def _save_training_checkpoint(
+    path: Path,
+    *,
+    model: nn.Module,
+    optimizer: Optimizer,
+    scheduler: LRScheduler | ReduceLROnPlateau,
+    epoch: int,
+    config: TrainingConfig,
+    metrics: Mapping[str, Any],
+    best_metric_value: float,
+) -> None:
+    save_checkpoint(
+        path,
+        model=model,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        epoch=epoch,
+        config=config,
+        metrics=metrics,
+        best_metric_value=best_metric_value,
+    )
+
+
 def run_distillation_loop(
     *,
     student: nn.Module,
@@ -654,19 +681,12 @@ def run_distillation_loop(
         checkpoint_best_value = (
             metric_value if best_metric_value is None else best_metric_value
         )
-        save_checkpoint(
-            latest_path,
-            model=student,
-            optimizer=optimizer,
-            scheduler=scheduler,
-            epoch=epoch,
-            config=training,
-            metrics=record,
-            best_metric_value=checkpoint_best_value,
-        )
+        checkpoint_targets = [latest_path]
         if is_best:
-            save_checkpoint(
-                best_path,
+            checkpoint_targets.append(best_path)
+        for checkpoint_path in checkpoint_targets:
+            _save_training_checkpoint(
+                checkpoint_path,
                 model=student,
                 optimizer=optimizer,
                 scheduler=scheduler,

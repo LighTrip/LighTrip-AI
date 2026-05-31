@@ -39,15 +39,11 @@ from scripts.title_color_recommendation.export_titlenet_onnx import (
     LOGITS_OUTPUT_NAME,
     TOP1_OUTPUT_NAME,
     build_model,
-    check_onnx_file,
-    export_onnx_model,
     export_paths,
+    export_checkpoint_from_args,
     load_checkpoint,
-    make_top1_wrapper,
+    make_onnxruntime_sessions,
     model_config_from_checkpoint,
-    run_onnxruntime_check,
-    validate_torch_outputs,
-    write_export_summary,
 )
 from src.models.fixed_palette_classifier import (
     count_total_parameters,
@@ -112,10 +108,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         )
     )
     parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
-    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
-    parser.add_argument("--logits-onnx", type=Path, default=DEFAULT_LOGITS_ONNX)
-    parser.add_argument("--top1-onnx", type=Path, default=DEFAULT_TOP1_ONNX)
-    parser.add_argument("--export-summary", type=Path, default=DEFAULT_EXPORT_SUMMARY)
     parser.add_argument("--model-name", default=None)
     parser.add_argument("--dropout", type=float, default=None)
     parser.add_argument("--weight-init", default=None)
@@ -138,8 +130,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=DEFAULT_PARITY_SAMPLE_COUNT,
     )
     parser.add_argument("--parity-seed", type=int, default=DEFAULT_SEED)
-    parser.add_argument("--parity-report", type=Path, default=DEFAULT_PARITY_REPORT)
-    parser.add_argument("--parity-metrics", type=Path, default=DEFAULT_PARITY_METRICS)
     parser.add_argument(
         "--max-abs-diff-threshold",
         type=float,
@@ -157,13 +147,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=DEFAULT_CALIBRATION_SAMPLE_COUNT,
     )
     parser.add_argument("--calibration-seed", type=int, default=DEFAULT_SEED)
-    parser.add_argument("--calibration-dir", type=Path, default=DEFAULT_CALIBRATION_DIR)
-    parser.add_argument(
-        "--calibration-manifest",
-        type=Path,
-        default=DEFAULT_CALIBRATION_MANIFEST,
-    )
-    parser.add_argument("--reference-metrics", type=Path, default=DEFAULT_REFERENCE_METRICS)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--latency-warmup-steps", type=int, default=10)
     parser.add_argument("--latency-benchmark-steps", type=int, default=50)
@@ -222,16 +205,6 @@ def make_dataset(
     )
 
 
-def safe_sample_stem(order: int, image_id: str) -> str:
-    safe_id = "".join(
-        char if char.isalnum() or char in {"-", "_", "."} else "_"
-        for char in image_id
-    ).strip("._")
-    if not safe_id:
-        safe_id = f"sample_{order:04d}"
-    return f"{order:04d}_{safe_id}"
-
-
 def validate_input_array(array: np.ndarray, *, image_id: str) -> None:
     if list(array.shape) != list(DEFAULT_INPUT_SHAPE):
         raise ValueError(
@@ -267,7 +240,7 @@ def write_calibration_samples(
         image_id = str(sample["image_id"])
         input_array = sample["x"].unsqueeze(0).detach().cpu().numpy().astype(np.float32)
         validate_input_array(input_array, image_id=image_id)
-        sample_path = sample_dir / f"{safe_sample_stem(order, image_id)}.npy"
+        sample_path = sample_dir / f"sample_{order:04d}.npy"
         np.save(sample_path, input_array)
         entries.append(
             {
@@ -556,13 +529,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     parity_report = resolve_inside_project(
         PROJECT_ROOT,
-        args.parity_report,
+        DEFAULT_PARITY_REPORT,
         must_exist=False,
         description="parity report",
     )
     parity_metrics_path = resolve_inside_project(
         PROJECT_ROOT,
-        args.parity_metrics,
+        DEFAULT_PARITY_METRICS,
         must_exist=False,
         description="parity metrics",
     )
@@ -570,44 +543,44 @@ def main(argv: list[str] | None = None) -> int:
     baseline_metrics_output = baseline_metrics_path()
     calibration_dir = resolve_inside_project(
         PROJECT_ROOT,
-        args.calibration_dir,
+        DEFAULT_CALIBRATION_DIR,
         must_exist=False,
         description="calibration dir",
     )
     calibration_manifest = resolve_inside_project(
         PROJECT_ROOT,
-        args.calibration_manifest,
+        DEFAULT_CALIBRATION_MANIFEST,
         must_exist=False,
         description="calibration manifest",
     )
     reference_metrics_path = resolve_inside_project(
         PROJECT_ROOT,
-        args.reference_metrics,
+        DEFAULT_REFERENCE_METRICS,
         must_exist=False,
         description="reference metrics",
     )
 
     output_dir = resolve_inside_project(
         PROJECT_ROOT,
-        args.output_dir,
+        DEFAULT_OUTPUT_DIR,
         must_exist=False,
         description="output dir",
     )
     logits_onnx = resolve_inside_project(
         PROJECT_ROOT,
-        args.logits_onnx,
+        DEFAULT_LOGITS_ONNX,
         must_exist=False,
         description="logits onnx",
     )
     top1_onnx = resolve_inside_project(
         PROJECT_ROOT,
-        args.top1_onnx,
+        DEFAULT_TOP1_ONNX,
         must_exist=False,
         description="top1 onnx",
     )
     export_summary = resolve_inside_project(
         PROJECT_ROOT,
-        args.export_summary,
+        DEFAULT_EXPORT_SUMMARY,
         must_exist=False,
         description="export summary",
     )
@@ -617,73 +590,25 @@ def main(argv: list[str] | None = None) -> int:
         top1_output=top1_onnx,
         summary_output=export_summary,
     )
-    checkpoint = load_checkpoint(checkpoint_path, torch)
-    config = model_config_from_checkpoint(
-        checkpoint,
-        model_name=args.model_name,
-        dropout=args.dropout,
-        weight_init=args.weight_init,
-        activation=args.activation,
-    )
-    model = build_model(checkpoint, config)
-    top1_model = make_top1_wrapper(model, torch)
-
     if not args.skip_export:
-        dummy_input = torch.randn(*DEFAULT_INPUT_SHAPE, dtype=torch.float32)
-        torch_validation = validate_torch_outputs(
-            logits_model=model,
-            top1_model=top1_model,
-            dummy_input=dummy_input,
-            num_classes=config.num_classes,
-            torch_module=torch,
-        )
-        export_onnx_model(
-            model=model,
-            dummy_input=dummy_input,
-            output_path=paths.logits_output,
-            output_name=LOGITS_OUTPUT_NAME,
-            opset=args.opset,
-            torch_module=torch,
-        )
-        export_onnx_model(
-            model=top1_model,
-            dummy_input=dummy_input,
-            output_path=paths.top1_output,
-            output_name=TOP1_OUTPUT_NAME,
-            opset=args.opset,
-            torch_module=torch,
-        )
-        onnx_checks = [
-            check_onnx_file(
-                paths.logits_output,
-                expected_output_name=LOGITS_OUTPUT_NAME,
-                expected_shape=[1, config.num_classes],
-                expected_dtype="float",
-                required=not args.skip_onnx_check,
-            ),
-            check_onnx_file(
-                paths.top1_output,
-                expected_output_name=TOP1_OUTPUT_NAME,
-                expected_shape=[1],
-                expected_dtype="int64",
-                required=not args.skip_onnx_check,
-            ),
-        ]
-        onnxruntime_check = run_onnxruntime_check(
-            paths=paths,
-            dummy_input=dummy_input,
-            num_classes=config.num_classes,
-            required=not args.skip_onnxruntime_check,
-        )
-        write_export_summary(
+        export_result = export_checkpoint_from_args(
+            args=args,
             paths=paths,
             checkpoint_path=checkpoint_path,
-            config=config,
-            opset=args.opset,
-            torch_validation=torch_validation,
-            onnx_checks=onnx_checks,
-            onnxruntime_check=onnxruntime_check,
+            torch_module=torch,
         )
+        config = export_result.config
+        model = export_result.model
+    else:
+        checkpoint = load_checkpoint(checkpoint_path, torch)
+        config = model_config_from_checkpoint(
+            checkpoint,
+            model_name=args.model_name,
+            dropout=args.dropout,
+            weight_init=args.weight_init,
+            activation=args.activation,
+        )
+        model = build_model(checkpoint, config)
 
     if not paths.logits_output.exists() or not paths.top1_output.exists():
         raise FileNotFoundError(
@@ -704,14 +629,7 @@ def main(argv: list[str] | None = None) -> int:
             seed=args.parity_seed,
         )
         palette_ids = load_palette_ids(palette_path, num_classes=DEFAULT_NUM_CLASSES)
-        logits_session = ort.InferenceSession(
-            str(paths.logits_output),
-            providers=["CPUExecutionProvider"],
-        )
-        top1_session = ort.InferenceSession(
-            str(paths.top1_output),
-            providers=["CPUExecutionProvider"],
-        )
+        logits_session, top1_session = make_onnxruntime_sessions(paths, ort)
         parity_results = run_parity_validation(
             model=model.cpu(),
             dataset=parity_dataset,

@@ -9,8 +9,6 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
-import yaml
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -22,6 +20,8 @@ from experiments.title_color_recommendation import (
     train_titlenet_student_distillation as student_distillation,
 )
 from experiments.title_color_recommendation.path_utils import (
+    load_yaml_mapping,
+    require_mapping,
     resolve_project_path as resolve_inside_project,
 )
 
@@ -155,24 +155,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _require_mapping(value: Any, *, description: str) -> Mapping[str, Any]:
-    if value is None:
-        return {}
-    if not isinstance(value, Mapping):
-        raise ValueError(f"{description} must be a mapping")
-    return value
-
-
 def _load_raw_config(path: Path) -> Mapping[str, Any]:
-    config_path = resolve_inside_project(
+    return load_yaml_mapping(
         PROJECT_ROOT,
         path,
-        must_exist=True,
         description="student kd weight sweep config",
     )
-    with config_path.open("r", encoding="utf-8") as file:
-        payload = yaml.safe_load(file) or {}
-    return _require_mapping(payload, description="student kd weight sweep config")
 
 
 def _resolve_output_path(value: str | Path, *, description: str) -> Path:
@@ -206,7 +194,7 @@ def _load_trials(section: Mapping[str, Any]) -> tuple[WeightTrial, ...]:
 
     trials: list[WeightTrial] = []
     for raw_trial in raw_trials:
-        trial = _require_mapping(raw_trial, description="kd weight trial")
+        trial = require_mapping(raw_trial, description="kd weight trial")
         trials.append(
             WeightTrial(
                 name=str(trial["name"]),
@@ -226,7 +214,7 @@ def _phase_config(
     epochs_override: int | None,
     learning_rate_override: float | None,
 ) -> PhaseConfig:
-    phase_section = _require_mapping(section.get(phase), description=phase)
+    phase_section = require_mapping(section.get(phase), description=phase)
     checkpoint_default = DEFAULT_CHECKPOINT_ROOT / phase
     log_default = DEFAULT_LOG_ROOT / phase
     report_default = DEFAULT_REPORT_ROOT / phase
@@ -253,8 +241,8 @@ def _phase_config(
 
 def load_sweep_config(args: argparse.Namespace) -> KDWeightSweepConfig:
     raw_config = _load_raw_config(args.config)
-    section = _require_mapping(raw_config.get(SWEEP_SECTION), description=SWEEP_SECTION)
-    outputs = _require_mapping(section.get("outputs"), description="sweep outputs")
+    section = require_mapping(raw_config.get(SWEEP_SECTION), description=SWEEP_SECTION)
+    outputs = require_mapping(section.get("outputs"), description="sweep outputs")
     return KDWeightSweepConfig(
         trials=_load_trials(section),
         from_scratch=_phase_config(
@@ -301,20 +289,33 @@ def _append_optional_arg(cli_args: list[str], flag: str, value: Any) -> None:
         cli_args.extend([flag, str(value)])
 
 
+def _append_shared_training_args(
+    cli_args: list[str],
+    args: argparse.Namespace,
+    *,
+    include_temperature: bool,
+) -> None:
+    for flag, value in (
+        ("--data-root", args.data_root),
+        ("--labels-matrix", args.labels_matrix),
+        ("--labels-soft", args.labels_soft),
+        ("--teacher-checkpoint", args.teacher_checkpoint),
+        ("--batch-size", args.batch_size),
+        ("--weight-decay", args.weight_decay),
+        ("--num-workers", args.num_workers),
+        ("--device", args.device),
+        ("--scheduler", args.scheduler),
+        ("--best-metric", args.best_metric),
+        ("--seed", args.seed),
+    ):
+        _append_optional_arg(cli_args, flag, value)
+    if include_temperature:
+        _append_optional_arg(cli_args, "--temperature", args.temperature)
+
+
 def base_distillation_args(args: argparse.Namespace) -> list[str]:
     cli_args = ["--config", str(args.config)]
-    _append_optional_arg(cli_args, "--data-root", args.data_root)
-    _append_optional_arg(cli_args, "--labels-matrix", args.labels_matrix)
-    _append_optional_arg(cli_args, "--labels-soft", args.labels_soft)
-    _append_optional_arg(cli_args, "--teacher-checkpoint", args.teacher_checkpoint)
-    _append_optional_arg(cli_args, "--batch-size", args.batch_size)
-    _append_optional_arg(cli_args, "--weight-decay", args.weight_decay)
-    _append_optional_arg(cli_args, "--num-workers", args.num_workers)
-    _append_optional_arg(cli_args, "--device", args.device)
-    _append_optional_arg(cli_args, "--scheduler", args.scheduler)
-    _append_optional_arg(cli_args, "--best-metric", args.best_metric)
-    _append_optional_arg(cli_args, "--seed", args.seed)
-    _append_optional_arg(cli_args, "--temperature", args.temperature)
+    _append_shared_training_args(cli_args, args, include_temperature=True)
     return cli_args
 
 
@@ -363,17 +364,7 @@ def distillation_args_for_trial(
 
 def student_only_args(args: argparse.Namespace) -> argparse.Namespace:
     cli_args = ["--config", str(args.config)]
-    _append_optional_arg(cli_args, "--data-root", args.data_root)
-    _append_optional_arg(cli_args, "--labels-matrix", args.labels_matrix)
-    _append_optional_arg(cli_args, "--labels-soft", args.labels_soft)
-    _append_optional_arg(cli_args, "--teacher-checkpoint", args.teacher_checkpoint)
-    _append_optional_arg(cli_args, "--batch-size", args.batch_size)
-    _append_optional_arg(cli_args, "--weight-decay", args.weight_decay)
-    _append_optional_arg(cli_args, "--num-workers", args.num_workers)
-    _append_optional_arg(cli_args, "--device", args.device)
-    _append_optional_arg(cli_args, "--scheduler", args.scheduler)
-    _append_optional_arg(cli_args, "--best-metric", args.best_metric)
-    _append_optional_arg(cli_args, "--seed", args.seed)
+    _append_shared_training_args(cli_args, args, include_temperature=False)
     _append_optional_arg(
         cli_args,
         "--student-only-checkpoint-dir",

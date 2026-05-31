@@ -8,8 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
-import yaml
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -19,6 +17,8 @@ from experiments.title_color_recommendation import (
     train_titlenet_student_distillation as student_distillation,
 )
 from experiments.title_color_recommendation.path_utils import (
+    load_yaml_mapping,
+    require_mapping,
     resolve_project_path as resolve_inside_project,
 )
 
@@ -81,24 +81,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "TitLeNet Student experiment."
         )
     )
-    parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
-    parser.add_argument("--data-root", type=Path, default=None)
-    parser.add_argument("--labels-matrix", type=Path, default=None)
-    parser.add_argument("--labels-soft", type=Path, default=None)
-    parser.add_argument("--teacher-checkpoint", type=Path, default=None)
-    parser.add_argument("--student-init-checkpoint", type=Path, default=None)
-    parser.add_argument("--epochs", type=int, default=None)
-    parser.add_argument("--batch-size", type=int, default=None)
-    parser.add_argument("--learning-rate", type=float, default=None)
-    parser.add_argument("--weight-decay", type=float, default=None)
-    parser.add_argument("--num-workers", type=int, default=None)
-    parser.add_argument("--device", default=None)
-    parser.add_argument("--scheduler", default=None)
-    parser.add_argument("--best-metric", default=None)
-    parser.add_argument("--seed", type=int, default=None)
-    parser.add_argument("--temperature", type=float, default=None)
-    parser.add_argument("--base-loss-weight", type=float, default=None)
-    parser.add_argument("--distillation-loss-weight", type=float, default=None)
+    student_distillation.add_distillation_training_args(parser)
     parser.add_argument("--distillation-epochs", type=int, default=None)
     parser.add_argument("--distillation-learning-rate", type=float, default=None)
     parser.add_argument("--student-only-checkpoint-dir", type=Path, default=None)
@@ -116,24 +99,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _require_mapping(value: Any, *, description: str) -> Mapping[str, Any]:
-    if value is None:
-        return {}
-    if not isinstance(value, Mapping):
-        raise ValueError(f"{description} must be a mapping")
-    return value
-
-
 def _load_raw_config(path: Path) -> Mapping[str, Any]:
-    config_path = resolve_inside_project(
+    return load_yaml_mapping(
         PROJECT_ROOT,
         path,
-        must_exist=True,
         description="student experiment config",
     )
-    with config_path.open("r", encoding="utf-8") as file:
-        payload = yaml.safe_load(file) or {}
-    return _require_mapping(payload, description="student experiment config")
 
 
 def _output_path(
@@ -149,7 +120,7 @@ def _output_path(
 
 def load_student_only_output_paths(args: argparse.Namespace) -> StudentOnlyOutputPaths:
     raw_config = _load_raw_config(args.config)
-    section = _require_mapping(raw_config.get("student_only"), description="student_only")
+    section = require_mapping(raw_config.get("student_only"), description="student_only")
     return StudentOnlyOutputPaths(
         checkpoint_dir=_output_path(
             section,
@@ -192,7 +163,7 @@ def load_student_only_output_paths(args: argparse.Namespace) -> StudentOnlyOutpu
 
 def load_experiment_output_paths(args: argparse.Namespace) -> ExperimentOutputPaths:
     raw_config = _load_raw_config(args.config)
-    section = _require_mapping(
+    section = require_mapping(
         raw_config.get("experiment_outputs"),
         description="experiment_outputs",
     )
@@ -225,7 +196,7 @@ def load_distillation_finetune_overrides(
     args: argparse.Namespace,
 ) -> dict[str, Any]:
     raw_config = _load_raw_config(args.config)
-    section = _require_mapping(
+    section = require_mapping(
         raw_config.get("distillation_finetune"),
         description="distillation_finetune",
     )

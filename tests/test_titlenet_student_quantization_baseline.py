@@ -27,12 +27,6 @@ def test_export_paths_allow_student_summary_output(tmp_path: Path) -> None:
     assert paths.summary_output.name == "student_summary.json"
 
 
-def test_safe_sample_stem_removes_path_separators() -> None:
-    stem = prep.safe_sample_stem(3, "trip/image:001")
-
-    assert stem == "0003_trip_image_001"
-
-
 class FakeCalibrationDataset:
     def __getitem__(self, index: int) -> dict[str, object]:
         x = torch.zeros((4, 36, 136), dtype=torch.float32)
@@ -53,7 +47,7 @@ def test_write_calibration_samples_creates_manifest_and_arrays(tmp_path: Path) -
     )
 
     manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
-    first_sample = np.load(tmp_path / "samples" / "0000_sample_2.npy")
+    first_sample = np.load(tmp_path / "samples" / "sample_0000.npy")
 
     assert summary.sample_count == 2
     assert manifest["model_id"] == prep.MODEL_ID
