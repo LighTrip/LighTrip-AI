@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from dataclasses import asdict, dataclass
@@ -70,14 +71,12 @@ DEFAULT_PARITY_REPORT = Path(
 DEFAULT_PARITY_METRICS = Path(
     f"outputs/reports/model_evaluation/onnx/{MODEL_ID}_parity_metrics.json"
 )
-BASELINE_REPORT_OUTPUT = (
-    PROJECT_ROOT
-    / "outputs/reports/model_evaluation/onnx/"
+BASELINE_REPORT_DISPLAY = (
+    "outputs/reports/model_evaluation/onnx/"
     "titlenet_student_warm_kd90_baseline_report.md"
 )
-BASELINE_METRICS_OUTPUT = (
-    PROJECT_ROOT
-    / "outputs/reports/model_evaluation/onnx/"
+BASELINE_METRICS_DISPLAY = (
+    "outputs/reports/model_evaluation/onnx/"
     "titlenet_student_warm_kd90_baseline_metrics.json"
 )
 DEFAULT_REFERENCE_METRICS = Path(
@@ -384,11 +383,17 @@ def benchmark_fp32_baseline(
 
 
 def write_baseline_metrics(*, payload: Mapping[str, Any]) -> None:
-    BASELINE_METRICS_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    BASELINE_METRICS_OUTPUT.write_text(
-        json.dumps(dict(payload), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+    os.makedirs("outputs/reports/model_evaluation/onnx", exist_ok=True)
+    with open(
+        "outputs/reports/model_evaluation/onnx/"
+        "titlenet_student_warm_kd90_baseline_metrics.json",
+        "w",
         encoding="utf-8",
-    )
+    ) as file:
+        file.write(
+            json.dumps(dict(payload), ensure_ascii=False, indent=2, sort_keys=True)
+            + "\n"
+        )
 
 
 def format_metric(value: Any) -> str:
@@ -400,7 +405,7 @@ def format_metric(value: Any) -> str:
 
 
 def write_baseline_report(*, payload: Mapping[str, Any]) -> None:
-    BASELINE_REPORT_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    os.makedirs("outputs/reports/model_evaluation/onnx", exist_ok=True)
     test_metrics = payload.get("reference_metrics", {}).get("test_metrics", {})
     teacher_agreement = payload.get("reference_metrics", {}).get(
         "test_teacher_agreement",
@@ -470,7 +475,13 @@ def write_baseline_report(*, payload: Mapping[str, Any]) -> None:
         )
     else:
         lines.append(f"- skipped: `{latency.get('reason', 'unknown')}`")
-    BASELINE_REPORT_OUTPUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    with open(
+        "outputs/reports/model_evaluation/onnx/"
+        "titlenet_student_warm_kd90_baseline_report.md",
+        "w",
+        encoding="utf-8",
+    ) as file:
+        file.write("\n".join(lines) + "\n")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -523,7 +534,7 @@ def main(argv: list[str] | None = None) -> int:
         must_exist=False,
         description="parity metrics",
     )
-    baseline_report = BASELINE_REPORT_OUTPUT
+    baseline_report = BASELINE_REPORT_DISPLAY
     calibration_dir = resolve_inside_project(
         PROJECT_ROOT,
         DEFAULT_CALIBRATION_DIR,
@@ -731,8 +742,8 @@ def main(argv: list[str] | None = None) -> int:
             "export_summary": display_path(paths.summary_output),
             "parity_report": display_path(parity_report),
             "parity_metrics": display_path(parity_metrics_path),
-            "baseline_report": display_path(baseline_report),
-            "baseline_metrics": display_path(BASELINE_METRICS_OUTPUT),
+            "baseline_report": baseline_report,
+            "baseline_metrics": BASELINE_METRICS_DISPLAY,
         },
     }
     write_baseline_metrics(payload=baseline_payload)
