@@ -61,7 +61,7 @@ def combined_soft_label_distillation_loss(
             "distillation_loss_weight must be non-negative: "
             f"{distillation_loss_weight}"
         )
-    if base_loss_weight == 0.0 and distillation_loss_weight == 0.0:
+    if base_loss_weight <= 0.0 and distillation_loss_weight <= 0.0:
         raise ValueError("at least one loss weight must be positive")
 
     base_loss = soft_label_kl_divergence(student_logits, target_distribution)

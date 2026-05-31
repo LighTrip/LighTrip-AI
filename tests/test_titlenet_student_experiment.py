@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -197,4 +198,9 @@ def test_student_experiment_report_and_metrics_are_written(
     assert "Student-only" in report
     assert "Student-distilled" in report
     assert "NDCG@3 improved or equal" in report
-    assert metrics["comparison"]["ndcg@5_delta_distilled_vs_student_only"] == 0.02
+    assert math.isclose(
+        metrics["comparison"]["ndcg@5_delta_distilled_vs_student_only"],
+        0.02,
+        rel_tol=1e-9,
+        abs_tol=1e-12,
+    )

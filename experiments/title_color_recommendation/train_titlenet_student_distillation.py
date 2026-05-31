@@ -384,8 +384,8 @@ def validate_distillation_config(config: StudentDistillationConfig) -> None:
             f"{config.loss.distillation_loss_weight}"
         )
     if (
-        config.loss.base_loss_weight == 0.0
-        and config.loss.distillation_loss_weight == 0.0
+        config.loss.base_loss_weight <= 0.0
+        and config.loss.distillation_loss_weight <= 0.0
     ):
         raise ValueError("at least one loss weight must be positive")
     if config.latency.warmup_steps < 0:

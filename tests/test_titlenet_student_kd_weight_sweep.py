@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -91,9 +92,9 @@ def test_distillation_args_for_trial_sets_phase_outputs(
     )
 
     assert distill_args.epochs == 5
-    assert distill_args.learning_rate == 0.0001
-    assert distill_args.base_loss_weight == 0.8
-    assert distill_args.distillation_loss_weight == 0.2
+    assert math.isclose(distill_args.learning_rate, 0.0001, rel_tol=1e-9)
+    assert math.isclose(distill_args.base_loss_weight, 0.8, rel_tol=1e-9)
+    assert math.isclose(distill_args.distillation_loss_weight, 0.2, rel_tol=1e-9)
     assert distill_args.student_init_checkpoint == init_checkpoint
     assert distill_args.checkpoint_dir == tmp_path / "checkpoints" / "kd_80_20"
 
@@ -191,5 +192,5 @@ def test_sweep_report_csv_and_metrics_are_written(
     metrics_payload = json.loads(metrics_path.read_text(encoding="utf-8"))
     report = report_path.read_text(encoding="utf-8")
     assert csv_rows[0]["trial"] == "kd_80_20"
-    assert metrics_payload["rows"][0]["test_ndcg@5"] == 0.94
+    assert math.isclose(metrics_payload["rows"][0]["test_ndcg@5"], 0.94, rel_tol=1e-9)
     assert "KD Sweep Results" in report

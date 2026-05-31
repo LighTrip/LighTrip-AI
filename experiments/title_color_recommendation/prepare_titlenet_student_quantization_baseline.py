@@ -163,8 +163,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=Path,
         default=DEFAULT_CALIBRATION_MANIFEST,
     )
-    parser.add_argument("--baseline-report", type=Path, default=DEFAULT_BASELINE_REPORT)
-    parser.add_argument("--baseline-metrics", type=Path, default=DEFAULT_BASELINE_METRICS)
     parser.add_argument("--reference-metrics", type=Path, default=DEFAULT_REFERENCE_METRICS)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--latency-warmup-steps", type=int, default=10)
@@ -324,6 +322,24 @@ def load_json_if_exists(path: Path) -> Mapping[str, Any]:
     return payload
 
 
+def baseline_report_path() -> Path:
+    return resolve_inside_project(
+        PROJECT_ROOT,
+        DEFAULT_BASELINE_REPORT,
+        must_exist=False,
+        description="baseline report",
+    )
+
+
+def baseline_metrics_path() -> Path:
+    return resolve_inside_project(
+        PROJECT_ROOT,
+        DEFAULT_BASELINE_METRICS,
+        must_exist=False,
+        description="baseline metrics",
+    )
+
+
 def benchmark_onnx_session(
     *,
     session: Any,
@@ -408,11 +424,8 @@ def benchmark_fp32_baseline(
     }
 
 
-def write_baseline_metrics(
-    *,
-    path: Path,
-    payload: Mapping[str, Any],
-) -> None:
+def write_baseline_metrics(*, payload: Mapping[str, Any]) -> None:
+    path = baseline_metrics_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(dict(payload), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
@@ -428,11 +441,8 @@ def format_metric(value: Any) -> str:
     return str(value)
 
 
-def write_baseline_report(
-    *,
-    path: Path,
-    payload: Mapping[str, Any],
-) -> None:
+def write_baseline_report(*, payload: Mapping[str, Any]) -> None:
+    path = baseline_report_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     test_metrics = payload.get("reference_metrics", {}).get("test_metrics", {})
     teacher_agreement = payload.get("reference_metrics", {}).get(
@@ -556,18 +566,8 @@ def main(argv: list[str] | None = None) -> int:
         must_exist=False,
         description="parity metrics",
     )
-    baseline_report = resolve_inside_project(
-        PROJECT_ROOT,
-        args.baseline_report,
-        must_exist=False,
-        description="baseline report",
-    )
-    baseline_metrics_path = resolve_inside_project(
-        PROJECT_ROOT,
-        args.baseline_metrics,
-        must_exist=False,
-        description="baseline metrics",
-    )
+    baseline_report = baseline_report_path()
+    baseline_metrics_output = baseline_metrics_path()
     calibration_dir = resolve_inside_project(
         PROJECT_ROOT,
         args.calibration_dir,
@@ -831,11 +831,11 @@ def main(argv: list[str] | None = None) -> int:
             "parity_report": display_path(parity_report),
             "parity_metrics": display_path(parity_metrics_path),
             "baseline_report": display_path(baseline_report),
-            "baseline_metrics": display_path(baseline_metrics_path),
+            "baseline_metrics": display_path(baseline_metrics_output),
         },
     }
-    write_baseline_metrics(path=baseline_metrics_path, payload=baseline_payload)
-    write_baseline_report(path=baseline_report, payload=baseline_payload)
+    write_baseline_metrics(payload=baseline_payload)
+    write_baseline_report(payload=baseline_payload)
 
     print(f"Prepared {MODEL_LABEL}")
     print(f"Logits ONNX: {paths.logits_output}")
