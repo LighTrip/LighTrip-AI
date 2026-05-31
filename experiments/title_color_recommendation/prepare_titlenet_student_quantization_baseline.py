@@ -70,11 +70,15 @@ DEFAULT_PARITY_REPORT = Path(
 DEFAULT_PARITY_METRICS = Path(
     f"outputs/reports/model_evaluation/onnx/{MODEL_ID}_parity_metrics.json"
 )
-DEFAULT_BASELINE_REPORT = Path(
-    f"outputs/reports/model_evaluation/onnx/{MODEL_ID}_baseline_report.md"
+BASELINE_REPORT_OUTPUT = (
+    PROJECT_ROOT
+    / "outputs/reports/model_evaluation/onnx/"
+    "titlenet_student_warm_kd90_baseline_report.md"
 )
-DEFAULT_BASELINE_METRICS = Path(
-    f"outputs/reports/model_evaluation/onnx/{MODEL_ID}_baseline_metrics.json"
+BASELINE_METRICS_OUTPUT = (
+    PROJECT_ROOT
+    / "outputs/reports/model_evaluation/onnx/"
+    "titlenet_student_warm_kd90_baseline_metrics.json"
 )
 DEFAULT_REFERENCE_METRICS = Path(
     "outputs/reports/model_evaluation/titlenet_student_kd_weight_sweep/"
@@ -295,24 +299,6 @@ def load_json_if_exists(path: Path) -> Mapping[str, Any]:
     return payload
 
 
-def baseline_report_path() -> Path:
-    return resolve_inside_project(
-        PROJECT_ROOT,
-        DEFAULT_BASELINE_REPORT,
-        must_exist=False,
-        description="baseline report",
-    )
-
-
-def baseline_metrics_path() -> Path:
-    return resolve_inside_project(
-        PROJECT_ROOT,
-        DEFAULT_BASELINE_METRICS,
-        must_exist=False,
-        description="baseline metrics",
-    )
-
-
 def benchmark_onnx_session(
     *,
     session: Any,
@@ -398,9 +384,8 @@ def benchmark_fp32_baseline(
 
 
 def write_baseline_metrics(*, payload: Mapping[str, Any]) -> None:
-    path = baseline_metrics_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
+    BASELINE_METRICS_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    BASELINE_METRICS_OUTPUT.write_text(
         json.dumps(dict(payload), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
@@ -415,8 +400,7 @@ def format_metric(value: Any) -> str:
 
 
 def write_baseline_report(*, payload: Mapping[str, Any]) -> None:
-    path = baseline_report_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
+    BASELINE_REPORT_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     test_metrics = payload.get("reference_metrics", {}).get("test_metrics", {})
     teacher_agreement = payload.get("reference_metrics", {}).get(
         "test_teacher_agreement",
@@ -486,7 +470,7 @@ def write_baseline_report(*, payload: Mapping[str, Any]) -> None:
         )
     else:
         lines.append(f"- skipped: `{latency.get('reason', 'unknown')}`")
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    BASELINE_REPORT_OUTPUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -539,8 +523,7 @@ def main(argv: list[str] | None = None) -> int:
         must_exist=False,
         description="parity metrics",
     )
-    baseline_report = baseline_report_path()
-    baseline_metrics_output = baseline_metrics_path()
+    baseline_report = BASELINE_REPORT_OUTPUT
     calibration_dir = resolve_inside_project(
         PROJECT_ROOT,
         DEFAULT_CALIBRATION_DIR,
@@ -749,7 +732,7 @@ def main(argv: list[str] | None = None) -> int:
             "parity_report": display_path(parity_report),
             "parity_metrics": display_path(parity_metrics_path),
             "baseline_report": display_path(baseline_report),
-            "baseline_metrics": display_path(baseline_metrics_output),
+            "baseline_metrics": display_path(BASELINE_METRICS_OUTPUT),
         },
     }
     write_baseline_metrics(payload=baseline_payload)
