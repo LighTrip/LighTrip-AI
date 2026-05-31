@@ -37,6 +37,18 @@ pip install onnx onnxruntime
   --opset 17
 ```
 
+Student 최고 후보는 기존 TitLeNet 산출물과 구분하기 위해 파일명을 분리한다.
+
+```bash
+/home/cvlab/anaconda3/envs/gemma_cuda/bin/python \
+  scripts/title_color_recommendation/export_titlenet_onnx.py \
+  --checkpoint outputs/checkpoints/titlenet_student_kd_weight_sweep/warm_start/kd_90_10/checkpoint_best.pt \
+  --logits-output outputs/title_color_recommendation/onnx/titlenet_student_warm_kd90_logits.onnx \
+  --top1-output outputs/title_color_recommendation/onnx/titlenet_student_warm_kd90_top1.onnx \
+  --summary-output outputs/title_color_recommendation/onnx/titlenet_student_warm_kd90_onnx_export_summary.json \
+  --opset 17
+```
+
 ONNX graph check까지 수행하려면 실행 환경에 `onnx` 패키지가 필요하다. 또한 top-1 ONNX 모델의 실제 dummy inference 결과까지 확인하려면 `onnxruntime` 패키지가 필요하다.
 
 `onnxruntime` 없이 export와 graph check만 수행하려면 다음 옵션을 사용할 수 있다.

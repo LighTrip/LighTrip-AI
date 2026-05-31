@@ -26,3 +26,8 @@ def test_mobile_inference_config_declares_logits_and_top1_exports() -> None:
     assert config["model_outputs"]["top1"]["shape"] == [1]
     assert config["model_outputs"]["top1"]["dtype"] == "int64"
     assert config["model_outputs"]["top1"]["postprocess"] == "argmax"
+
+
+def test_checkpoint_security_check_limits_paths_to_project_root(tmp_path: Path) -> None:
+    assert export_titlenet_onnx.is_project_path(Path("outputs/checkpoints/model.pt"))
+    assert not export_titlenet_onnx.is_project_path(tmp_path / "external.pt")
