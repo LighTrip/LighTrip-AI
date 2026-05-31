@@ -40,6 +40,7 @@ from src.models.title_color_models import (
     build_titlenet_fast_a,
     build_titlenet_fast_b,
     build_titlenet_fast_c,
+    build_titlenet_student,
     build_titlenet_stage_ablation_variant,
     build_vit_tiny,
     normalize_activation_name,
@@ -68,6 +69,7 @@ MODEL_TITLENET = "titlenet"
 MODEL_TITLENET_FAST_A = "titlenet_fast_a"
 MODEL_TITLENET_FAST_B = "titlenet_fast_b"
 MODEL_TITLENET_FAST_C = "titlenet_fast_c"
+MODEL_TITLENET_STUDENT = "titlenet_student"
 MODEL_MASK_AWARE_CNN = "mask_aware_cnn"
 MODEL_MASK_AWARE_CNN_M = "mask_aware_cnn_m"
 MODEL_MASK_AWARE_PALETTE_NET = "mask_aware_palette_net"
@@ -223,6 +225,10 @@ MODEL_SPECS: dict[str, ModelSpec] = {
         MODEL_TITLENET_FAST_C,
         build_titlenet_fast_c,
     ),
+    MODEL_TITLENET_STUDENT: _custom_spec(
+        MODEL_TITLENET_STUDENT,
+        build_titlenet_student,
+    ),
     MODEL_SIMPLE_CNN_M_RES_DEEPER: _custom_spec(
         MODEL_SIMPLE_CNN_M_RES_DEEPER,
         build_simple_cnn_medium_residual_deeper,
@@ -343,6 +349,12 @@ MODEL_ALIASES = {
     "title-net-fast-b": MODEL_TITLENET_FAST_B,
     "titlenet-fast-c": MODEL_TITLENET_FAST_C,
     "title-net-fast-c": MODEL_TITLENET_FAST_C,
+    "titlenet-student": MODEL_TITLENET_STUDENT,
+    "title-net-student": MODEL_TITLENET_STUDENT,
+    "titlenet_student_v1": MODEL_TITLENET_STUDENT,
+    "titlenet-student-v1": MODEL_TITLENET_STUDENT,
+    "titlenet-ablation-guided-student": MODEL_TITLENET_STUDENT,
+    "titlenet_ablation_guided_student": MODEL_TITLENET_STUDENT,
     "simplecnn-m-res-deeper": MODEL_SIMPLE_CNN_M_RES_DEEPER,
     "simplecnn_m_res_deeper": MODEL_SIMPLE_CNN_M_RES_DEEPER,
     "simple-cnn-m-res-deeper": MODEL_SIMPLE_CNN_M_RES_DEEPER,

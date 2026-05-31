@@ -1,0 +1,91 @@
+teacher:
+  model_name: titlenet
+  checkpoint_path: outputs/checkpoints/titlenet_ndcg3_eval/checkpoint_best.pt
+  dropout: 0.2
+  weight_init: small_head
+  activation: gelu
+
+student:
+  model_name: titlenet_student
+  dropout: 0.2
+  weight_init: small_head
+  activation: hardswish
+
+training:
+  batch_size: 64
+  epochs: 20
+  learning_rate: 0.0005
+  weight_decay: 0.0001
+  num_classes: 32
+  num_workers: 4
+  device: cuda
+  scheduler: cosine
+  best_metric: val_ndcg@5
+  seed: 42
+
+data:
+  data_root: data/title_color_recommendation
+  labels_matrix:
+  labels_soft:
+
+distillation:
+  temperature: 2.0
+  base_loss_weight: 0.8
+  distillation_loss_weight: 0.2
+
+distillation_finetune:
+  epochs: 10
+  learning_rate: 0.0001
+
+latency:
+  warmup_steps: 10
+  benchmark_steps: 50
+
+outputs:
+  checkpoint_dir: outputs/checkpoints/titlenet_student_distillation
+  log_path: outputs/logs/titlenet_student_distillation.jsonl
+  report_path: outputs/reports/model_evaluation/titlenet_student_distillation_report.md
+  metrics_path: outputs/reports/model_evaluation/titlenet_student_distillation_metrics.json
+
+student_only:
+  checkpoint_dir: outputs/checkpoints/titlenet_student_only
+  log_path: outputs/logs/titlenet_student_only.jsonl
+  report_path: outputs/reports/model_evaluation/titlenet_student_only_report.md
+  loss_plot_path: outputs/reports/model_evaluation/titlenet_student_only_loss.png
+  ndcg_plot_path: outputs/reports/model_evaluation/titlenet_student_only_ndcg.png
+  color_plot_path: outputs/reports/model_evaluation/titlenet_student_only_colors.png
+
+experiment_outputs:
+  report_path: outputs/reports/model_evaluation/titlenet_student_experiment_report.md
+  metrics_path: outputs/reports/model_evaluation/titlenet_student_experiment_metrics.json
+
+kd_weight_sweep:
+  trials:
+    - name: kd_50_50
+      base_loss_weight: 0.5
+      distillation_loss_weight: 0.5
+    - name: kd_70_30
+      base_loss_weight: 0.7
+      distillation_loss_weight: 0.3
+    - name: kd_80_20
+      base_loss_weight: 0.8
+      distillation_loss_weight: 0.2
+    - name: kd_90_10
+      base_loss_weight: 0.9
+      distillation_loss_weight: 0.1
+  from_scratch:
+    epochs: 20
+    learning_rate: 0.0005
+    checkpoint_root: outputs/checkpoints/titlenet_student_kd_weight_sweep/from_scratch
+    log_root: outputs/logs/titlenet_student_kd_weight_sweep/from_scratch
+    report_root: outputs/reports/model_evaluation/titlenet_student_kd_weight_sweep/from_scratch
+  warm_start:
+    epochs: 10
+    learning_rate: 0.0001
+    checkpoint_root: outputs/checkpoints/titlenet_student_kd_weight_sweep/warm_start
+    log_root: outputs/logs/titlenet_student_kd_weight_sweep/warm_start
+    report_root: outputs/reports/model_evaluation/titlenet_student_kd_weight_sweep/warm_start
+  outputs:
+    report_path: outputs/reports/model_evaluation/titlenet_student_kd_weight_sweep_report.md
+    metrics_path: outputs/reports/model_evaluation/titlenet_student_kd_weight_sweep_metrics.json
+    results_csv: outputs/reports/model_evaluation/titlenet_student_kd_weight_sweep_results.csv

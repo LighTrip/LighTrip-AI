@@ -1553,6 +1553,24 @@ def build_titlenet_fast_c(
     )
 
 
+def build_titlenet_student(
+    *,
+    num_classes: int = DEFAULT_NUM_CLASSES,
+    dropout: float = 0.2,
+    activation: str = DEFAULT_ACTIVATION,
+    **_kwargs: Any,
+) -> ResidualSimpleCNN:
+    return _build_residual_simple_cnn_variant(
+        num_classes=num_classes,
+        hidden_dim=128,
+        feature_channels=(32, 64, 96, 128),
+        residual_blocks=(0, 1, 1),
+        use_eca=True,
+        dropout=dropout,
+        activation=activation,
+    )
+
+
 VARIANT_HIDDEN_DIM = "hidden_dim"
 VARIANT_FEATURE_CHANNELS = "feature_channels"
 VARIANT_RESIDUAL_BLOCKS = "residual_blocks"

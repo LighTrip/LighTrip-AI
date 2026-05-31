@@ -23,6 +23,7 @@ TITLENET = "titlenet"
 TITLENET_FAST_A = "titlenet_fast_a"
 TITLENET_FAST_B = "titlenet_fast_b"
 TITLENET_FAST_C = "titlenet_fast_c"
+TITLENET_STUDENT = "titlenet_student"
 MASK_AWARE_PALETTE_NET = "mask_aware_palette_net"
 MASK_AWARE_TINY_HYBRID_RANKER = "mask_aware_tiny_hybrid_ranker"
 TITLENET_NO_SE = "titlenet_no_se"
@@ -74,6 +75,7 @@ MODEL_NAMES = (
     TITLENET_FAST_A,
     TITLENET_FAST_B,
     TITLENET_FAST_C,
+    TITLENET_STUDENT,
     SIMPLE_CNN_M_RES_DEEPER,
     SIMPLE_CNN_M_MASK_POOL,
     SIMPLE_CNN_L,
@@ -161,6 +163,11 @@ def test_title_color_model_registry_normalizes_aliases(registry_module: Any) -> 
     assert registry_module.normalize_model_name("TitLeNet-Shallow") == TITLENET_SHALLOW
     assert registry_module.normalize_model_name("TitLeNet-Deeper") == TITLENET_DEEPER
     assert registry_module.normalize_model_name("TitLeNet-Fast-A") == TITLENET_FAST_A
+    assert registry_module.normalize_model_name("TitLeNet-Student") == TITLENET_STUDENT
+    assert (
+        registry_module.normalize_model_name("TitLeNet-Ablation-Guided-Student")
+        == TITLENET_STUDENT
+    )
     assert (
         registry_module.normalize_model_name("Mask-Aware-Tiny-Hybrid-Ranker")
         == MASK_AWARE_TINY_HYBRID_RANKER
@@ -341,6 +348,33 @@ def test_titlenet_fast_variants_are_smaller_than_titlenet(
         parameter_count = sum(parameter.numel() for parameter in model.parameters())
         assert parameter_count < titlenet_count
         assert tuple(feature_map.shape) == (1, 160, 5, 17)
+
+
+def test_titlenet_student_is_ablation_guided_new_variant(
+    torch_module: Any,
+    registry_module: Any,
+) -> None:
+    titlenet = registry_module.build_title_color_model(
+        TITLENET,
+        pretrained=False,
+        activation=GELU_ACTIVATION,
+    )
+    student = registry_module.build_title_color_model(
+        TITLENET_STUDENT,
+        pretrained=False,
+        activation=HARDSWISH_ACTIVATION,
+    )
+
+    titlenet_count = sum(parameter.numel() for parameter in titlenet.parameters())
+    student_count = sum(parameter.numel() for parameter in student.parameters())
+
+    with torch_module.no_grad():
+        feature_map = student.features(torch_module.zeros((1, 4, 36, 136)))
+        logits = student(torch_module.zeros((1, 4, 36, 136)))
+
+    assert student_count < titlenet_count
+    assert tuple(feature_map.shape) == (1, 128, 5, 17)
+    assert tuple(logits.shape) == (1, 32)
 
 
 def test_titlenet_ablation_variants_have_expected_capacity(

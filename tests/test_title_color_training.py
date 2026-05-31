@@ -89,6 +89,40 @@ def test_soft_label_kl_divergence_matches_expected_shape(
     assert math.isclose(float(loss.item()), 0.0, rel_tol=0.0, abs_tol=1e-6)
 
 
+def test_distillation_loss_is_zero_for_matching_logits(
+    torch_module: Any,
+    training_modules: dict[str, Any],
+) -> None:
+    logits = torch_module.randn((2, 32), dtype=torch_module.float32)
+
+    loss = training_modules["losses"].distillation_kl_divergence(
+        logits,
+        logits.clone(),
+        temperature=2.0,
+    )
+
+    assert tuple(loss.shape) == ()
+    assert math.isclose(float(loss.item()), 0.0, rel_tol=0.0, abs_tol=1e-6)
+
+
+def test_combined_distillation_loss_rejects_empty_weights(
+    torch_module: Any,
+    training_modules: dict[str, Any],
+) -> None:
+    logits = torch_module.zeros((2, 32), dtype=torch_module.float32)
+    target = torch_module.full((2, 32), 1.0 / 32.0, dtype=torch_module.float32)
+
+    with pytest.raises(ValueError, match="at least one"):
+        training_modules["losses"].combined_soft_label_distillation_loss(
+            logits,
+            target,
+            logits,
+            temperature=2.0,
+            base_loss_weight=0.0,
+            distillation_loss_weight=0.0,
+        )
+
+
 def test_validation_metrics_compute_expected_shapes(
     torch_module: Any,
     training_modules: dict[str, Any],
