@@ -88,14 +88,6 @@ def load_json(path: Path) -> Any:
     return json.loads(project_path(path).read_text(encoding="utf-8"))
 
 
-def deployment_metadata_path() -> Path:
-    return DEPLOYMENT_METADATA_OUTPUT_PATH
-
-
-def deployment_report_path() -> Path:
-    return DEPLOYMENT_REPORT_OUTPUT_PATH
-
-
 def require_mapping(value: Any, *, description: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise TypeError(f"{description} must be a mapping")
@@ -318,9 +310,9 @@ def build_metadata(validation: DeploymentValidation) -> dict[str, Any]:
 
 
 def write_metadata(payload: Mapping[str, Any]) -> None:
-    metadata_path = deployment_metadata_path()
+    metadata_path = DEPLOYMENT_METADATA_OUTPUT_PATH
     metadata_path.parent.mkdir(parents=True, exist_ok=True)
-    metadata_path.write_text(
+    metadata_path.write_text(  # NOSONAR: fixed project-internal deployment artifact path.
         json.dumps(dict(payload), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
@@ -400,9 +392,12 @@ def write_report(metadata: Mapping[str, Any]) -> None:
         "- Confirm React Native runtime support for FP16 internal ops before final release.",
         "- Measure latency on the target Android/iOS device; Python CPU latency is only a reference.",
     ]
-    report_path = deployment_report_path()
+    report_path = DEPLOYMENT_REPORT_OUTPUT_PATH
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    report_path.write_text(  # NOSONAR: fixed project-internal deployment report path.
+        "\n".join(lines) + "\n",
+        encoding="utf-8",
+    )
 
 
 def package_deployment() -> Mapping[str, Any]:
