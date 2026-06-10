@@ -79,6 +79,7 @@ class ModelBundle:
     model_name: str
     label: str
     checkpoint_path: Path
+    model_dtype: str
     model: nn.Module
 
 
@@ -118,6 +119,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--target-class", type=int, default=None)
     parser.add_argument("--preview-top-k", type=int, default=3)
     parser.add_argument("--device", default="cuda")
+    parser.add_argument(
+        "--model-dtype",
+        choices=("float32", "float16"),
+        default="float32",
+        help="Model/input dtype for hook-based visualization.",
+    )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--paper-overview-path", type=Path, default=None)
     parser.add_argument(
@@ -215,13 +222,28 @@ def indices_for_image_ids(dataset: TitleColorDataset, image_ids: list[str]) -> l
     return [index_by_id[image_id] for image_id in image_ids]
 
 
+def resolve_model_dtype(raw_dtype: str) -> torch.dtype:
+    if raw_dtype == "float32":
+        return torch.float32
+    if raw_dtype == "float16":
+        return torch.float16
+    raise ValueError(f"unsupported model dtype: {raw_dtype}")
+
+
+def model_input_tensor(sample: Mapping[str, Any], bundle: ModelBundle, device: torch.device) -> Tensor:
+    model_dtype = resolve_model_dtype(bundle.model_dtype)
+    return sample["x"].unsqueeze(0).to(device=device, dtype=model_dtype)
+
+
 def load_model_bundle(
     *,
     model_name: str,
     checkpoint_path: Path,
     label: str,
     device: torch.device,
+    model_dtype: str,
 ) -> ModelBundle:
+    torch_dtype = resolve_model_dtype(model_dtype)
     checkpoint = load_checkpoint(checkpoint_path)
     config = training_config_from_checkpoint(
         checkpoint,
@@ -231,12 +253,13 @@ def load_model_bundle(
         num_workers=0,
     )
     model = build_model_from_checkpoint(checkpoint, config)
-    model.to(device)
+    model.to(device=device, dtype=torch_dtype)
     model.eval()
     return ModelBundle(
         model_name=normalize_model_name(model_name),
         label=label,
         checkpoint_path=checkpoint_path,
+        model_dtype=model_dtype,
         model=model,
     )
 
@@ -265,6 +288,7 @@ def load_comparison_bundles(
                 checkpoint_path=checkpoint_path,
                 label=display_model_name(normalized),
                 device=device,
+                model_dtype=full_bundle.model_dtype,
             )
         )
     return bundles
@@ -435,24 +459,27 @@ def normalize_tensor_map(value: Tensor, *, eps: float = 1e-8) -> Tensor:
 
 
 def rgb_array(x: Tensor) -> np.ndarray:
-    return x[0, :3].detach().cpu().permute(1, 2, 0).numpy().clip(0.0, 1.0)
+    array = x[0, :3].detach().cpu().permute(1, 2, 0).numpy()
+    return array.clip(0.0, 1.0).astype(np.float32, copy=False)
 
 
 def mask_array(x: Tensor) -> np.ndarray:
-    return x[0, 3].detach().cpu().numpy().clip(0.0, 1.0)
+    array = x[0, 3].detach().cpu().numpy()
+    return array.clip(0.0, 1.0).astype(np.float32, copy=False)
 
 
 def heatmap_array(heatmap: Tensor) -> np.ndarray:
-    return heatmap[0, 0].detach().cpu().numpy().clip(0.0, 1.0)
+    array = heatmap[0, 0].detach().cpu().numpy()
+    return array.clip(0.0, 1.0).astype(np.float32, copy=False)
 
 
 def top_probability(logits: Tensor, class_index: int) -> float:
-    probabilities = torch.softmax(logits, dim=-1)
+    probabilities = torch.softmax(logits.float(), dim=-1)
     return float(probabilities[0, class_index].detach().cpu().item())
 
 
 def topk_predictions(logits: Tensor, *, limit: int) -> list[tuple[int, float]]:
-    probabilities = torch.softmax(logits, dim=-1)
+    probabilities = torch.softmax(logits.float(), dim=-1)
     topk = probabilities.topk(min(limit, int(probabilities.shape[-1])), dim=-1)
     return [
         (int(palette_id), float(probability))
@@ -731,7 +758,7 @@ def add_paper_overview_row(
     device: torch.device,
 ) -> None:
     sample = dataset[dataset_index]
-    x = sample["x"].unsqueeze(0).to(device)
+    x = model_input_tensor(sample, full_bundle, device)
     image = rgb_array(x)
     logits, activations = capture_stage_activations(full_bundle.model, x)
     gradcam, class_index, _gradcam_logits = gradcam_for_target(
@@ -896,7 +923,7 @@ def visualize_sample(
 ) -> SampleRecord:
     sample = dataset[dataset_index]
     image_id = str(sample["image_id"])
-    x = sample["x"].unsqueeze(0).to(device)
+    x = model_input_tensor(sample, full_bundle, device)
     logits, activations = capture_stage_activations(full_bundle.model, x)
     gradcam, class_index, gradcam_logits = gradcam_for_target(
         full_bundle.model,
@@ -948,6 +975,7 @@ def write_report(
         "",
         f"- checkpoint: `{full_bundle.checkpoint_path}`",
         f"- model_name: `{full_bundle.model_name}`",
+        f"- model_dtype: `{full_bundle.model_dtype}`",
         f"- split: `{args.split}`",
         f"- target_class: `{args.target_class}`",
         "",
@@ -1019,6 +1047,7 @@ def run(args: argparse.Namespace) -> list[SampleRecord]:
         checkpoint_path=resolve_path(args.checkpoint, must_exist=True),
         label=FULL_TITLENET_LABEL,
         device=device,
+        model_dtype=args.model_dtype,
     )
     comparison_bundles = load_comparison_bundles(
         args,
