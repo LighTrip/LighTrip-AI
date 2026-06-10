@@ -312,10 +312,10 @@ def build_metadata(validation: DeploymentValidation) -> dict[str, Any]:
 def write_metadata(payload: Mapping[str, Any]) -> None:
     metadata_path = DEPLOYMENT_METADATA_OUTPUT_PATH
     metadata_path.parent.mkdir(parents=True, exist_ok=True)
-    metadata_path.write_text(  # NOSONAR: fixed project-internal deployment artifact path.
-        json.dumps(dict(payload), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    metadata_content = (
+        json.dumps(dict(payload), ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     )
+    metadata_path.write_text(metadata_content, encoding="utf-8")  # NOSONAR
 
 
 def format_metric(value: Any) -> str:
@@ -394,10 +394,7 @@ def write_report(metadata: Mapping[str, Any]) -> None:
     ]
     report_path = DEPLOYMENT_REPORT_OUTPUT_PATH
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(  # NOSONAR: fixed project-internal deployment report path.
-        "\n".join(lines) + "\n",
-        encoding="utf-8",
-    )
+    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")  # NOSONAR
 
 
 def package_deployment() -> Mapping[str, Any]:
