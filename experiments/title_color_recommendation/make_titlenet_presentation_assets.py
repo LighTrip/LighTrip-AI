@@ -1,23 +1,18 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
-os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
-
-import matplotlib
-
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+from experiments.title_color_recommendation.plot_utils import load_pyplot
+
+plt = load_pyplot(PROJECT_ROOT)
 
 
 STUDENT_EXPERIMENT_METRICS = PROJECT_ROOT / (
@@ -50,6 +45,23 @@ OUTPUT_DIR = PROJECT_ROOT / (
 )
 FIGURE_DIR = OUTPUT_DIR / "figures"
 MARKDOWN_OUTPUT = OUTPUT_DIR / "presentation_tables_and_figures.md"
+MODEL_STUDENT = "Student"
+MODEL_STUDENT_QAT = "Student-QAT"
+PREFIX_STUDENT_KD = "Student KD "
+PREFIX_STUDENT_QAT = "Student QAT "
+LABEL_STUDENT_KD_FP32 = f"{PREFIX_STUDENT_KD}FP32"
+LABEL_STUDENT_KD_PTQ_FP16 = f"{PREFIX_STUDENT_KD}PTQ FP16"
+LABEL_STUDENT_KD_PTQ_INT8_DYNAMIC = f"{PREFIX_STUDENT_KD}PTQ INT8 Dynamic"
+LABEL_STUDENT_KD_PTQ_INT8_STATIC = f"{PREFIX_STUDENT_KD}PTQ INT8 Static"
+LABEL_STUDENT_QAT_FP32 = f"{PREFIX_STUDENT_QAT}FP32"
+LABEL_STUDENT_QAT_PTQ_FP16 = f"{PREFIX_STUDENT_QAT}+ PTQ FP16"
+LABEL_STUDENT_QAT_PTQ_INT8_DYNAMIC = f"{PREFIX_STUDENT_QAT}+ PTQ INT8 Dynamic"
+LABEL_STUDENT_QAT_PTQ_INT8_STATIC = f"{PREFIX_STUDENT_QAT}+ PTQ INT8 Static"
+LABEL_STUDENT_QAT_STATIC_INT8_SWEEP_BEST = (
+    f"{PREFIX_STUDENT_QAT}Static INT8 Sweep Best"
+)
+HEADER_NDCG_AT_5 = "NDCG@5"
+HEADER_SIZE_MB = "Size (MB)"
 
 
 @dataclass(frozen=True)
@@ -192,46 +204,52 @@ def build_quantization_rows(
     quant_lookup = quantization_row_lookup(quantization_payload)
     latency_lookup = mobile_latency_lookup(mobile_payload)
     mappings = [
-        ("Student KD FP32", "Student", "baseline", "student_kd_fp32", "Reference"),
+        (LABEL_STUDENT_KD_FP32, MODEL_STUDENT, "baseline", "student_kd_fp32", "Reference"),
         (
-            "Student KD PTQ FP16",
-            "Student",
+            LABEL_STUDENT_KD_PTQ_FP16,
+            MODEL_STUDENT,
             "PTQ float16_conversion",
             "student_kd_ptq_fp16",
             "Passed",
         ),
         (
-            "Student KD PTQ INT8 Dynamic",
-            "Student",
+            LABEL_STUDENT_KD_PTQ_INT8_DYNAMIC,
+            MODEL_STUDENT,
             "PTQ dynamic",
             "student_kd_ptq_int8_dynamic",
             "Passed",
         ),
         (
-            "Student KD PTQ INT8 Static",
-            "Student",
+            LABEL_STUDENT_KD_PTQ_INT8_STATIC,
+            MODEL_STUDENT,
             "PTQ static_qdq",
             "student_kd_ptq_int8_static",
             "Rejected",
         ),
-        ("Student QAT FP32", "Student-QAT", "QAT baseline", "student_qat_fp32", "Reference"),
         (
-            "Student QAT + PTQ FP16",
-            "Student-QAT",
+            LABEL_STUDENT_QAT_FP32,
+            MODEL_STUDENT_QAT,
+            "QAT baseline",
+            "student_qat_fp32",
+            "Reference",
+        ),
+        (
+            LABEL_STUDENT_QAT_PTQ_FP16,
+            MODEL_STUDENT_QAT,
             "QAT+PTQ float16_conversion",
             "student_qat_ptq_fp16",
             "Selected",
         ),
         (
-            "Student QAT + PTQ INT8 Dynamic",
-            "Student-QAT",
+            LABEL_STUDENT_QAT_PTQ_INT8_DYNAMIC,
+            MODEL_STUDENT_QAT,
             "QAT+PTQ dynamic",
             "student_qat_ptq_int8_dynamic",
             "Passed, not final",
         ),
         (
-            "Student QAT + PTQ INT8 Static",
-            "Student-QAT",
+            LABEL_STUDENT_QAT_PTQ_INT8_STATIC,
+            MODEL_STUDENT_QAT,
             "QAT+PTQ static_qdq",
             "student_qat_ptq_int8_static",
             "Rejected",
@@ -271,8 +289,8 @@ def build_quantization_rows(
         ndcg5 = qat_baseline_ndcg5 - float(best_static["ndcg_at_5_drop"])
         rows.append(
             QuantizationPresentationRow(
-                label="Student QAT Static INT8 Sweep Best",
-                model_variant="Student-QAT",
+                label=LABEL_STUDENT_QAT_STATIC_INT8_SWEEP_BEST,
+                model_variant=MODEL_STUDENT_QAT,
                 method="Static INT8 Sweep Best",
                 top1_agreement=float(best_static["top1_agreement"]),
                 ndcg_at_3=ndcg3,
@@ -316,7 +334,7 @@ def save_student_compression_plot(
 ) -> None:
     metrics = [
         ("Parameters", float(teacher_profile["total_parameters"]), float(student_profile["total_parameters"])),
-        ("Size (MB)", float(teacher_profile["model_size_mb"]), float(student_profile["model_size_mb"])),
+        (HEADER_SIZE_MB, float(teacher_profile["model_size_mb"]), float(student_profile["model_size_mb"])),
         (
             "Batch1 latency (ms)",
             nested_float(teacher_profile, ("batch1_latency", "inference_time_ms")) or 0.0,
@@ -367,7 +385,7 @@ def save_kd_sweep_plot(
         label="Student-only",
     )
     axis.set_xlabel("Base loss weight")
-    axis.set_ylabel("NDCG@5")
+    axis.set_ylabel(HEADER_NDCG_AT_5)
     axis.set_title("KD Weight Sweep")
     axis.grid(alpha=0.25)
     axis.legend()
@@ -429,7 +447,7 @@ def save_quantization_tradeoff_plot(
             fontsize=7.5,
         )
     axis.set_xlabel("CPU proxy P95 latency (ms)")
-    axis.set_ylabel("NDCG@5")
+    axis.set_ylabel(HEADER_NDCG_AT_5)
     axis.set_title("Quantization Trade-off")
     axis.grid(alpha=0.25)
     fig.tight_layout()
@@ -443,14 +461,14 @@ def save_final_candidate_plot(
     path: Path,
 ) -> None:
     selected_labels = [
-        "Student QAT FP32",
-        "Student QAT + PTQ FP16",
-        "Student QAT + PTQ INT8 Dynamic",
-        "Student QAT Static INT8 Sweep Best",
+        LABEL_STUDENT_QAT_FP32,
+        LABEL_STUDENT_QAT_PTQ_FP16,
+        LABEL_STUDENT_QAT_PTQ_INT8_DYNAMIC,
+        LABEL_STUDENT_QAT_STATIC_INT8_SWEEP_BEST,
     ]
     selected_rows = [row for row in rows if row.label in selected_labels]
     labels = [
-        row.label.replace("Student QAT ", "").replace("+ PTQ ", "")
+        row.label.replace(PREFIX_STUDENT_QAT, "").replace("+ PTQ ", "")
         for row in selected_rows
     ]
     size_values = [float(row.size_mb or 0.0) for row in selected_rows]
@@ -507,7 +525,7 @@ def build_markdown(
     ]
     lines.extend(
         markdown_table(
-            ["Model", "Parameters", "Size (MB)", "Batch1 Latency (ms)", "Activation"],
+            ["Model", "Parameters", HEADER_SIZE_MB, "Batch1 Latency (ms)", "Activation"],
             [
                 [
                     "Teacher TitLeNet",
@@ -576,7 +594,7 @@ def build_markdown(
                 "Trial",
                 "Base:KD",
                 "NDCG@3",
-                "NDCG@5",
+                HEADER_NDCG_AT_5,
                 "Teacher Top-1 Agreement",
                 "Best Epoch",
             ],
@@ -633,8 +651,8 @@ def build_markdown(
                 "Method",
                 "Top-1 Agreement",
                 "NDCG@3",
-                "NDCG@5",
-                "Size (MB)",
+                HEADER_NDCG_AT_5,
+                HEADER_SIZE_MB,
                 "CPU Proxy P50/P95 (ms)",
                 "1-thread P50/P95 (ms)",
                 "Decision",
@@ -662,7 +680,7 @@ def build_markdown(
             "",
             "## 5. 모델 비교 및 최종 후보 선정",
             "",
-            "발표 메시지: 최종 후보는 `Student QAT + PTQ FP16`이다. INT8 계열은 일부 조건에서 더 빠르지만 top-1 agreement가 배포 기준을 만족하지 못했다.",
+            f"발표 메시지: 최종 후보는 `{LABEL_STUDENT_QAT_PTQ_FP16}`이다. INT8 계열은 일부 조건에서 더 빠르지만 top-1 agreement가 배포 기준을 만족하지 못했다.",
             "",
             "### Table 5. Final Candidate Summary",
             "",
@@ -673,10 +691,10 @@ def build_markdown(
         for row in quant_rows
         if row.label
         in {
-            "Student QAT FP32",
-            "Student QAT + PTQ FP16",
-            "Student QAT + PTQ INT8 Dynamic",
-            "Student QAT Static INT8 Sweep Best",
+            LABEL_STUDENT_QAT_FP32,
+            LABEL_STUDENT_QAT_PTQ_FP16,
+            LABEL_STUDENT_QAT_PTQ_INT8_DYNAMIC,
+            LABEL_STUDENT_QAT_STATIC_INT8_SWEEP_BEST,
         }
     ]
     lines.extend(
@@ -684,8 +702,8 @@ def build_markdown(
             [
                 "Candidate",
                 "Top-1 Agreement",
-                "NDCG@5",
-                "Size (MB)",
+                HEADER_NDCG_AT_5,
+                HEADER_SIZE_MB,
                 "CPU Proxy P95 (ms)",
                 "Decision",
                 "Reason",
@@ -717,7 +735,7 @@ def build_markdown(
             "",
             "## 발표용 핵심 문장",
             "",
-            "> Student QAT + PTQ FP16 was selected as the final on-device candidate because it preserved 100% top-1 agreement while reducing the top-1 ONNX model size from 0.292 MB to 0.153 MB. Static INT8 variants showed competitive proxy latency, but were rejected because their top-1 agreement did not satisfy the deployment threshold.",
+            f"> {LABEL_STUDENT_QAT_PTQ_FP16} was selected as the final on-device candidate because it preserved 100% top-1 agreement while reducing the top-1 ONNX model size from 0.292 MB to 0.153 MB. Static INT8 variants showed competitive proxy latency, but were rejected because their top-1 agreement did not satisfy the deployment threshold.",
             "",
         ]
     )

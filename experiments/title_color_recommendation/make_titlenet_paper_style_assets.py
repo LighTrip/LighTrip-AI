@@ -1,25 +1,25 @@
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
-
-os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
-
-import matplotlib
-
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from experiments.title_color_recommendation.plot_utils import load_pyplot
 from experiments.title_color_recommendation.make_titlenet_presentation_assets import (
+    HEADER_NDCG_AT_5,
+    HEADER_SIZE_MB,
     KD_SWEEP_METRICS,
+    LABEL_STUDENT_QAT_FP32,
+    LABEL_STUDENT_QAT_PTQ_FP16,
+    LABEL_STUDENT_QAT_PTQ_INT8_DYNAMIC,
+    LABEL_STUDENT_QAT_STATIC_INT8_SWEEP_BEST,
     MOBILE_PROXY_METRICS,
     ONNX_PARITY_METRICS,
+    PREFIX_STUDENT_KD,
+    PREFIX_STUDENT_QAT,
     QAT_QUANTIZATION_METRICS,
     QUANTIZATION_METRICS,
     STATIC_SWEEP_METRICS,
@@ -33,6 +33,8 @@ from experiments.title_color_recommendation.make_titlenet_presentation_assets im
     pct,
     reduction,
 )
+
+plt = load_pyplot(PROJECT_ROOT)
 
 
 OUTPUT_DIR = PROJECT_ROOT / (
@@ -165,7 +167,7 @@ def save_kd_sweep_figure(
         label="Student-only",
     )
     axis.set_xlabel("Base loss weight")
-    axis.set_ylabel("NDCG@5")
+    axis.set_ylabel(HEADER_NDCG_AT_5)
     axis.set_title("Effect of KD Weight and Initialization Strategy")
     axis.grid(alpha=0.25)
     axis.legend(frameon=False, loc="lower right")
@@ -231,8 +233,8 @@ def save_quantization_tradeoff_figure(
         )
         if row.decision in {"Selected", "Rejected", "Reference"}:
             short_label = (
-                row.label.replace("Student QAT ", "QAT ")
-                .replace("Student KD ", "KD ")
+                row.label.replace(PREFIX_STUDENT_QAT, "QAT ")
+                .replace(PREFIX_STUDENT_KD, "KD ")
                 .replace(" + ", "\n+ ")
             )
             axis.annotate(
@@ -243,7 +245,7 @@ def save_quantization_tradeoff_figure(
                 fontsize=7.5,
             )
     axis.set_xlabel("CPU proxy P95 latency (ms)")
-    axis.set_ylabel("NDCG@5")
+    axis.set_ylabel(HEADER_NDCG_AT_5)
     axis.set_title("Accuracy-Latency-Size Trade-off")
     axis.grid(alpha=0.25)
     fig.savefig(path, dpi=300)
@@ -256,14 +258,14 @@ def save_final_candidate_figure(
     path: Path,
 ) -> None:
     labels = {
-        "Student QAT FP32",
-        "Student QAT + PTQ FP16",
-        "Student QAT + PTQ INT8 Dynamic",
-        "Student QAT Static INT8 Sweep Best",
+        LABEL_STUDENT_QAT_FP32,
+        LABEL_STUDENT_QAT_PTQ_FP16,
+        LABEL_STUDENT_QAT_PTQ_INT8_DYNAMIC,
+        LABEL_STUDENT_QAT_STATIC_INT8_SWEEP_BEST,
     }
     final_rows = selected_rows(rows, labels)
     x_labels = [
-        row.label.replace("Student QAT ", "").replace("+ PTQ ", "")
+        row.label.replace(PREFIX_STUDENT_QAT, "").replace("+ PTQ ", "")
         for row in final_rows
     ]
     top1_values = [float(row.top1_agreement or 0.0) for row in final_rows]
@@ -328,7 +330,7 @@ def build_markdown(
     )
     lines.extend(
         markdown_table(
-            ["Model", "Parameters", "Size (MB)", "Batch1 Latency (ms)", "Activation"],
+            ["Model", "Parameters", HEADER_SIZE_MB, "Batch1 Latency (ms)", "Activation"],
             [
                 [
                     "TitLeNet Teacher",
@@ -413,7 +415,7 @@ def build_markdown(
                 "KD ratio",
                 "Base:KD",
                 "NDCG@3",
-                "NDCG@5",
+                HEADER_NDCG_AT_5,
                 "Teacher top-1 agreement",
             ],
             kd_table_rows,
@@ -429,7 +431,7 @@ def build_markdown(
     lines.extend(
         figure_caption(
             "Figure 2",
-            "NDCG@5 trend according to KD weight and initialization strategy.",
+            f"{HEADER_NDCG_AT_5} trend according to KD weight and initialization strategy.",
         )
     )
     lines.extend(
@@ -496,8 +498,8 @@ def build_markdown(
                 "Optimization",
                 "Top-1 Agr.",
                 "NDCG@3",
-                "NDCG@5",
-                "Size (MB)",
+                HEADER_NDCG_AT_5,
+                HEADER_SIZE_MB,
                 "P50/P95 (ms)",
                 "Decision",
             ],
@@ -550,10 +552,10 @@ def build_markdown(
     final_rows = selected_rows(
         rows,
         {
-            "Student QAT FP32",
-            "Student QAT + PTQ FP16",
-            "Student QAT + PTQ INT8 Dynamic",
-            "Student QAT Static INT8 Sweep Best",
+            LABEL_STUDENT_QAT_FP32,
+            LABEL_STUDENT_QAT_PTQ_FP16,
+            LABEL_STUDENT_QAT_PTQ_INT8_DYNAMIC,
+            LABEL_STUDENT_QAT_STATIC_INT8_SWEEP_BEST,
         },
     )
     lines.extend(
@@ -561,15 +563,15 @@ def build_markdown(
             [
                 "Candidate",
                 "Top-1 Agr.",
-                "NDCG@5",
-                "Size (MB)",
+                HEADER_NDCG_AT_5,
+                HEADER_SIZE_MB,
                 "P95 (ms)",
                 "Decision",
                 "Rationale",
             ],
             [
                 [
-                    row.label.replace("Student QAT ", ""),
+                    row.label.replace(PREFIX_STUDENT_QAT, ""),
                     fmt(row.top1_agreement, 2),
                     fmt(row.ndcg_at_5, 6),
                     fmt(row.size_mb),
@@ -604,7 +606,7 @@ def build_markdown(
         [
             "### Slide-Ready Conclusion",
             "",
-            "The `Student QAT + PTQ FP16` model was selected as the final on-device candidate because it preserved 100% top-1 agreement while reducing the top-1 ONNX model size from 0.292 MB to 0.153 MB. Although static INT8 variants achieved competitive proxy latency, they were rejected because their top-1 agreement did not satisfy the deployment threshold.",
+            f"The `{LABEL_STUDENT_QAT_PTQ_FP16}` model was selected as the final on-device candidate because it preserved 100% top-1 agreement while reducing the top-1 ONNX model size from 0.292 MB to 0.153 MB. Although static INT8 variants achieved competitive proxy latency, they were rejected because their top-1 agreement did not satisfy the deployment threshold.",
             "",
         ]
     )

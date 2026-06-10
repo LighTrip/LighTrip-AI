@@ -112,6 +112,16 @@ class QuantizationResult:
     reason: str | None = None
 
 
+@dataclass(frozen=True)
+class QuantizationValidationContext:
+    fp32_logits_session: Any
+    fp32_top1_session: Any
+    dataset: TitleColorDataset
+    indices: list[int]
+    min_top1_agreement: float
+    max_ndcg5_drop: float
+
+
 class NumpyCalibrationDataReader:
     def __init__(self, arrays: Iterable[np.ndarray]) -> None:
         self._arrays = [array.astype(np.float32, copy=False) for array in arrays]
@@ -619,12 +629,7 @@ def run_trial(
     top1_onnx: Path,
     output_dir: Path,
     calibration_reader_factory: Callable[[], NumpyCalibrationDataReader],
-    fp32_logits_session: Any,
-    fp32_top1_session: Any,
-    dataset: TitleColorDataset,
-    indices: list[int],
-    min_top1_agreement: float,
-    max_ndcg5_drop: float,
+    validation_context: QuantizationValidationContext,
     warmup_steps: int,
     benchmark_steps: int,
     skip_latency: bool,
@@ -659,14 +664,14 @@ def run_trial(
         quantized_logits_session = make_session(quantized_logits, ort)
         quantized_top1_session = make_session(quantized_top1, ort)
         validation = validate_quantized_pair(
-            fp32_logits_session=fp32_logits_session,
-            fp32_top1_session=fp32_top1_session,
+            fp32_logits_session=validation_context.fp32_logits_session,
+            fp32_top1_session=validation_context.fp32_top1_session,
             quantized_logits_session=quantized_logits_session,
             quantized_top1_session=quantized_top1_session,
-            dataset=dataset,
-            indices=indices,
-            min_top1_agreement=min_top1_agreement,
-            max_ndcg5_drop=max_ndcg5_drop,
+            dataset=validation_context.dataset,
+            indices=validation_context.indices,
+            min_top1_agreement=validation_context.min_top1_agreement,
+            max_ndcg5_drop=validation_context.max_ndcg5_drop,
         )
         latency = benchmark_quantized_logits(
             logits_path=quantized_logits,
@@ -910,6 +915,14 @@ def main(argv: list[str] | None = None) -> int:
 
     fp32_logits_session = make_session(logits_onnx, ort)
     fp32_top1_session = make_session(top1_onnx, ort)
+    validation_context = QuantizationValidationContext(
+        fp32_logits_session=fp32_logits_session,
+        fp32_top1_session=fp32_top1_session,
+        dataset=validation_dataset,
+        indices=validation_indices,
+        min_top1_agreement=args.min_top1_agreement,
+        max_ndcg5_drop=args.max_ndcg5_drop,
+    )
     started_at = time.time()
     results = [
         run_trial(
@@ -918,12 +931,7 @@ def main(argv: list[str] | None = None) -> int:
             top1_onnx=top1_onnx,
             output_dir=output_dir,
             calibration_reader_factory=calibration_reader_factory,
-            fp32_logits_session=fp32_logits_session,
-            fp32_top1_session=fp32_top1_session,
-            dataset=validation_dataset,
-            indices=validation_indices,
-            min_top1_agreement=args.min_top1_agreement,
-            max_ndcg5_drop=args.max_ndcg5_drop,
+            validation_context=validation_context,
             warmup_steps=args.latency_warmup_steps,
             benchmark_steps=args.latency_benchmark_steps,
             skip_latency=args.skip_latency,

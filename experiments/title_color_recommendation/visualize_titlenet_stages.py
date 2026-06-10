@@ -222,7 +222,7 @@ def indices_for_image_ids(dataset: TitleColorDataset, image_ids: list[str]) -> l
     return [index_by_id[image_id] for image_id in image_ids]
 
 
-def resolve_model_dtype(raw_dtype: str, device: torch.device) -> torch.dtype:
+def resolve_model_dtype(raw_dtype: str) -> torch.dtype:
     if raw_dtype == "float32":
         return torch.float32
     if raw_dtype == "float16":
@@ -231,7 +231,7 @@ def resolve_model_dtype(raw_dtype: str, device: torch.device) -> torch.dtype:
 
 
 def model_input_tensor(sample: Mapping[str, Any], bundle: ModelBundle, device: torch.device) -> Tensor:
-    model_dtype = resolve_model_dtype(bundle.model_dtype, device)
+    model_dtype = resolve_model_dtype(bundle.model_dtype)
     return sample["x"].unsqueeze(0).to(device=device, dtype=model_dtype)
 
 
@@ -243,7 +243,7 @@ def load_model_bundle(
     device: torch.device,
     model_dtype: str,
 ) -> ModelBundle:
-    torch_dtype = resolve_model_dtype(model_dtype, device)
+    torch_dtype = resolve_model_dtype(model_dtype)
     checkpoint = load_checkpoint(checkpoint_path)
     config = training_config_from_checkpoint(
         checkpoint,

@@ -1,10 +1,16 @@
 from __future__ import annotations
 
 import json
-import os
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Mapping
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from experiments.title_color_recommendation.path_utils import resolve_project_path
 
 
 BASELINE_METRICS_PATH = Path(
@@ -27,11 +33,11 @@ MOBILE_PROXY_METRICS_PATH = Path(
     "outputs/reports/model_evaluation/onnx/"
     "titlenet_student_mobile_proxy_latency_metrics.json"
 )
-REPORT_OUTPUT = (
+REPORT_OUTPUT = Path(
     "outputs/reports/model_evaluation/onnx/"
     "titlenet_student_quantization_comparison_report.md"
 )
-METRICS_OUTPUT = (
+METRICS_OUTPUT = Path(
     "outputs/reports/model_evaluation/onnx/"
     "titlenet_student_quantization_comparison_metrics.json"
 )
@@ -59,7 +65,13 @@ class ComparisonRow:
 
 
 def load_json(path: Path) -> Mapping[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    metrics_path = resolve_project_path(
+        PROJECT_ROOT,
+        path,
+        must_exist=True,
+        description="metrics path",
+    )
+    payload = json.loads(metrics_path.read_text(encoding="utf-8"))
     if not isinstance(payload, Mapping):
         raise TypeError(f"metrics payload must be a mapping: {path}")
     return payload
@@ -82,8 +94,14 @@ def nested_float(
 def path_size_mb(path_text: str | None) -> float | None:
     if not path_text:
         return None
-    path = Path(path_text)
-    if not path.exists():
+    try:
+        path = resolve_project_path(
+            PROJECT_ROOT,
+            path_text,
+            must_exist=True,
+            description="model artifact path",
+        )
+    except (FileNotFoundError, ValueError):
         return None
     return path.stat().st_size / (1024 * 1024)
 
@@ -416,7 +434,20 @@ def build_report(rows: list[ComparisonRow]) -> str:
 
 
 def write_outputs(rows: list[ComparisonRow], report: str) -> None:
-    os.makedirs("outputs/reports/model_evaluation/onnx", exist_ok=True)
+    metrics_path = resolve_project_path(
+        PROJECT_ROOT,
+        METRICS_OUTPUT,
+        must_exist=False,
+        description="comparison metrics output",
+    )
+    report_path = resolve_project_path(
+        PROJECT_ROOT,
+        REPORT_OUTPUT,
+        must_exist=False,
+        description="comparison report output",
+    )
+    metrics_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "rows": [asdict(row) for row in rows],
         "deployment_candidates": [
@@ -424,20 +455,11 @@ def write_outputs(rows: list[ComparisonRow], report: str) -> None:
             for row in deployment_candidates(rows)
         ],
     }
-    with open(
-        "outputs/reports/model_evaluation/onnx/"
-        "titlenet_student_quantization_comparison_metrics.json",
-        "w",
+    metrics_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
-    ) as file:
-        file.write(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
-    with open(
-        "outputs/reports/model_evaluation/onnx/"
-        "titlenet_student_quantization_comparison_report.md",
-        "w",
-        encoding="utf-8",
-    ) as file:
-        file.write(report)
+    )
+    report_path.write_text(report, encoding="utf-8")
 
 
 def main() -> int:

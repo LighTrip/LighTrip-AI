@@ -33,6 +33,11 @@ DEFAULT_REPEATS = 5
 DEFAULT_SEED = 42
 OUTPUT_MIN = 0
 OUTPUT_MAX = 31
+MODEL_VARIANT_STUDENT_KD = "Student KD"
+MODEL_VARIANT_STUDENT_QAT = "Student QAT"
+THREAD_MODE_DEFAULT = "default"
+THREAD_MODE_SINGLE = "single_thread"
+THREAD_MODE_TWO = "two_thread"
 
 
 @dataclass(frozen=True)
@@ -84,14 +89,14 @@ class BenchmarkResult:
 DEFAULT_MODELS = (
     ModelSpec(
         key="student_kd_fp32",
-        model_variant="Student KD",
+        model_variant=MODEL_VARIANT_STUDENT_KD,
         method="FP32 ONNX",
         path=Path("outputs/title_color_recommendation/onnx/titlenet_student_warm_kd90_top1.onnx"),
         decision="Reference",
     ),
     ModelSpec(
         key="student_kd_ptq_fp16",
-        model_variant="Student KD",
+        model_variant=MODEL_VARIANT_STUDENT_KD,
         method="PTQ FP16",
         path=Path(
             "outputs/title_color_recommendation/quantization/"
@@ -101,7 +106,7 @@ DEFAULT_MODELS = (
     ),
     ModelSpec(
         key="student_kd_ptq_int8_dynamic",
-        model_variant="Student KD",
+        model_variant=MODEL_VARIANT_STUDENT_KD,
         method="PTQ INT8 Dynamic",
         path=Path(
             "outputs/title_color_recommendation/quantization/"
@@ -111,7 +116,7 @@ DEFAULT_MODELS = (
     ),
     ModelSpec(
         key="student_kd_ptq_int8_static",
-        model_variant="Student KD",
+        model_variant=MODEL_VARIANT_STUDENT_KD,
         method="PTQ INT8 Static",
         path=Path(
             "outputs/title_color_recommendation/quantization/"
@@ -121,21 +126,21 @@ DEFAULT_MODELS = (
     ),
     ModelSpec(
         key="student_qat_fp32",
-        model_variant="Student QAT",
+        model_variant=MODEL_VARIANT_STUDENT_QAT,
         method="FP32 ONNX",
         path=Path("outputs/title_color_recommendation/onnx/titlenet_student_qat_kd90_top1.onnx"),
         decision="Reference",
     ),
     ModelSpec(
         key="student_qat_ptq_fp16",
-        model_variant="Student QAT",
+        model_variant=MODEL_VARIANT_STUDENT_QAT,
         method="QAT + PTQ FP16",
         path=Path("outputs/title_color_recommendation/deployment/titlenet_student_qat_fp16_top1.onnx"),
         decision="Selected",
     ),
     ModelSpec(
         key="student_qat_ptq_int8_dynamic",
-        model_variant="Student QAT",
+        model_variant=MODEL_VARIANT_STUDENT_QAT,
         method="QAT + PTQ INT8 Dynamic",
         path=Path(
             "outputs/title_color_recommendation/quantization/qat_kd90/"
@@ -145,7 +150,7 @@ DEFAULT_MODELS = (
     ),
     ModelSpec(
         key="student_qat_ptq_int8_static",
-        model_variant="Student QAT",
+        model_variant=MODEL_VARIANT_STUDENT_QAT,
         method="QAT + PTQ INT8 Static",
         path=Path(
             "outputs/title_color_recommendation/quantization/qat_kd90/"
@@ -155,7 +160,7 @@ DEFAULT_MODELS = (
     ),
     ModelSpec(
         key="student_qat_static_int8_sweep_best",
-        model_variant="Student QAT",
+        model_variant=MODEL_VARIANT_STUDENT_QAT,
         method="Static INT8 Sweep Best",
         path=Path(
             "outputs/title_color_recommendation/quantization/static_int8_sweep/qat/"
@@ -168,19 +173,19 @@ DEFAULT_MODELS = (
 
 THREAD_MODES = (
     ThreadMode(
-        key="default",
+        key=THREAD_MODE_DEFAULT,
         label="ORT CPU default",
         intra_op_threads=None,
         inter_op_threads=None,
     ),
     ThreadMode(
-        key="single_thread",
+        key=THREAD_MODE_SINGLE,
         label="ORT CPU 1-thread",
         intra_op_threads=1,
         inter_op_threads=1,
     ),
     ThreadMode(
-        key="two_thread",
+        key=THREAD_MODE_TWO,
         label="ORT CPU 2-thread",
         intra_op_threads=2,
         inter_op_threads=1,
@@ -376,6 +381,46 @@ def result_by_mode(
     return None
 
 
+def latency_pair(result: BenchmarkResult | None) -> str:
+    if result is None:
+        return "-"
+    return f"{fmt(result.latency.p50_ms)}/{fmt(result.latency.p95_ms)}"
+
+
+def model_result_map(
+    results: list[BenchmarkResult],
+    model: ModelSpec,
+) -> dict[str, BenchmarkResult | None]:
+    return {
+        mode: result_by_mode(results, model_key=model.key, thread_mode=mode)
+        for mode in (THREAD_MODE_DEFAULT, THREAD_MODE_SINGLE, THREAD_MODE_TWO)
+    }
+
+
+def benchmark_table_row(results: list[BenchmarkResult], model: ModelSpec) -> str:
+    by_mode = model_result_map(results, model)
+    default = by_mode[THREAD_MODE_DEFAULT]
+    size = default.top1_size_mb if default is not None else None
+    return (
+        f"| {model.model_variant} | {model.method} | {fmt(size)} | "
+        f"{latency_pair(default)} | {latency_pair(by_mode[THREAD_MODE_SINGLE])} | "
+        f"{latency_pair(by_mode[THREAD_MODE_TWO])} | {model.decision} |"
+    )
+
+
+def load_time_table_row(results: list[BenchmarkResult], model: ModelSpec) -> str:
+    by_mode = model_result_map(results, model)
+    default = by_mode[THREAD_MODE_DEFAULT]
+    single = by_mode[THREAD_MODE_SINGLE]
+    two = by_mode[THREAD_MODE_TWO]
+    return (
+        f"| {model.model_variant} | {model.method} | "
+        f"{fmt(default.load_ms if default else None)} | "
+        f"{fmt(single.load_ms if single else None)} | "
+        f"{fmt(two.load_ms if two else None)} |"
+    )
+
+
 def write_report(
     *,
     path: Path,
@@ -413,30 +458,7 @@ def write_report(
     ]
 
     for model in DEFAULT_MODELS:
-        default = result_by_mode(results, model_key=model.key, thread_mode="default")
-        single = result_by_mode(results, model_key=model.key, thread_mode="single_thread")
-        two = result_by_mode(results, model_key=model.key, thread_mode="two_thread")
-        size = default.top1_size_mb if default is not None else None
-        default_latency = (
-            f"{fmt(default.latency.p50_ms)}/{fmt(default.latency.p95_ms)}"
-            if default is not None
-            else "-"
-        )
-        single_latency = (
-            f"{fmt(single.latency.p50_ms)}/{fmt(single.latency.p95_ms)}"
-            if single is not None
-            else "-"
-        )
-        two_latency = (
-            f"{fmt(two.latency.p50_ms)}/{fmt(two.latency.p95_ms)}"
-            if two is not None
-            else "-"
-        )
-        lines.append(
-            f"| {model.model_variant} | {model.method} | {fmt(size)} | "
-            f"{default_latency} | {single_latency} | {two_latency} | "
-            f"{model.decision} |"
-        )
+        lines.append(benchmark_table_row(results, model))
 
     lines.extend(
         [
@@ -448,15 +470,7 @@ def write_report(
         ]
     )
     for model in DEFAULT_MODELS:
-        default = result_by_mode(results, model_key=model.key, thread_mode="default")
-        single = result_by_mode(results, model_key=model.key, thread_mode="single_thread")
-        two = result_by_mode(results, model_key=model.key, thread_mode="two_thread")
-        lines.append(
-            f"| {model.model_variant} | {model.method} | "
-            f"{fmt(default.load_ms if default else None)} | "
-            f"{fmt(single.load_ms if single else None)} | "
-            f"{fmt(two.load_ms if two else None)} |"
-        )
+        lines.append(load_time_table_row(results, model))
 
     invalid_outputs = [result for result in results if not result.output_range_valid]
     lines.extend(
