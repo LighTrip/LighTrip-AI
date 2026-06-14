@@ -3,12 +3,22 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api.gemma import router as gemma_router
+
+from app.api.embedding import router as embedding_router
+from app.services.embedding_service import (
+    is_embedding_model_loaded,
+    load_embedding_model,
+    unload_embedding_model,
+)
+
 from app.api.pipeline import router as pipeline_router
+
 from app.services.category_service import (
     is_category_model_loaded,
     load_category_model,
     unload_category_model,
 )
+
 from app.services.gemma_service import load_model, unload_model, is_model_loaded
 
 
@@ -16,7 +26,9 @@ from app.services.gemma_service import load_model, unload_model, is_model_loaded
 async def lifespan(app: FastAPI):
     load_model()
     load_category_model()
+    load_embedding_model()
     yield
+    unload_embedding_model()
     unload_category_model()
     unload_model()
 
@@ -28,9 +40,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# app.include_router(gemma_router)
 app.include_router(pipeline_router)
-
+# app.include_router(gemma_router)
+app.include_router(embedding_router)    
 
 @app.get("/")
 async def root():
@@ -43,4 +55,5 @@ async def health():
         "status": "ok",
         "gemma_model_loaded": is_model_loaded(),
         "category_model_loaded": is_category_model_loaded(),
+        "embedding_model_loaded": is_embedding_model_loaded(),
     }
