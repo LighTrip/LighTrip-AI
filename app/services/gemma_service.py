@@ -1,3 +1,5 @@
+"""Gemma GGUF 모델 로딩, 프롬프트 구성, 응답 파싱을 담당하는 서비스."""
+
 from __future__ import annotations
 
 import json
@@ -132,6 +134,7 @@ def build_direct_prompt(
 ) -> str:
     draft_prompt = build_prompt(user_prompt, references)
     labels_block = "\n".join(f"- {label}" for label in allowed_categories)
+    # direct 모드는 후처리가 쉽도록 draft/category만 담은 JSON을 강제한다.
     fallback_instruction = (
         '주요 카테고리에 맞지 않거나 애매하면 "기타"를 선택해라.'
         if "기타" in allowed_categories
@@ -160,6 +163,7 @@ def load_model(verbose: bool = True) -> None:
     if _llm is not None:
         return
 
+    # 비전 입력은 mmproj chat handler를 붙인 Llama 인스턴스로 처리한다.
     chat_handler = create_chat_handler(MMPROJ_PATH, verbose=verbose)
     _llm = create_llm(MODEL_PATH, chat_handler, verbose=verbose)
 
@@ -189,6 +193,7 @@ def parse_direct_output(
 ) -> GemmaDirectResult:
     decoded = _parse_json_object(raw_output)
     if decoded is None:
+        # JSON 파싱 실패 시에도 draft 후보는 남겨 SVM fallback이 사용할 수 있게 한다.
         return GemmaDirectResult(
             draft=raw_output.strip(),
             category=None,
@@ -244,6 +249,7 @@ def generate_blog_draft_and_category_from_bytes(
         references=references,
         allowed_categories=allowed_categories,
     )
+    # pipeline API의 기본 경로: 이미지에서 draft와 category를 한 번에 받는다.
     response = llm.create_chat_completion(
         messages=build_vision_messages(image_data_uri, prompt_text),
         **GEMMA_CONFIG.generation.as_chat_completion_kwargs(),

@@ -1,3 +1,5 @@
+"""llama.cpp 기반 Gemma 비전 모델 런타임 생성 헬퍼."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -11,6 +13,7 @@ from app.config.gemma_config import GEMMA_CONFIG, GemmaModelConfig
 
 class Gemma4VisionChatHandler(Llava15ChatHandler):
     DEFAULT_SYSTEM_MESSAGE = None
+    # Gemma 4 vision GGUF가 기대하는 turn token 형식에 맞춘 chat template.
     CHAT_FORMAT = (
         "{% for message in messages %}"
         "{% if message.role == 'system' %}"
@@ -55,6 +58,7 @@ class Gemma4VisionChatHandler(Llava15ChatHandler):
             return
 
         with suppress_stdout_stderr(disable=self.verbose):
+            # mmproj context는 이미지 임베딩을 만들기 위한 멀티모달 전처리 컨텍스트다.
             ctx_params = self._mtmd_cpp.mtmd_context_params_default()
             ctx_params.use_gpu = self.mmproj_use_gpu
             ctx_params.print_timings = self.verbose

@@ -1,3 +1,5 @@
+"""Gemma/SVM이 공유하는 서비스 카테고리 정책."""
+
 from __future__ import annotations
 
 from typing import Any, Final

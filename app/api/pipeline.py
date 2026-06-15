@@ -1,3 +1,5 @@
+"""이미지 기반 초안 생성과 카테고리 분류를 묶어 제공하는 API 라우터."""
+
 from __future__ import annotations
 
 import logging
@@ -51,6 +53,7 @@ async def generate(
         if not image_bytes:
             raise HTTPException(status_code=400, detail="이미지 파일이 비어 있습니다.")
 
+        # 라우터는 HTTP 검증만 담당하고, 실제 추론 순서는 service 계층에 위임한다.
         result = generate_draft_and_classify(
             llm=llm,
             image_bytes=image_bytes,

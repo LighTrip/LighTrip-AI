@@ -1,3 +1,5 @@
+"""서비스 프롬프트 템플릿과 사용자 입력/참고자료 결합 로직."""
+
 from __future__ import annotations
 
 import re
@@ -9,6 +11,7 @@ REFERENCE_CHUNK_SPLIT_PATTERN = re.compile(r"\n\s*\n+")
 
 
 def _escape_reference_delimiters(text: str) -> str:
+    # 사용자 제공 참고자료가 프롬프트 구획 태그를 깨지 않도록 이스케이프한다.
     return text.replace("<참고자료>", "[참고자료]").replace("</참고자료>", "[/참고자료]")
 
 
@@ -42,6 +45,7 @@ def format_references(references: str | None = None) -> str:
     if not safe_references:
         return ""
 
+    # 빈 줄 단위로 검색/참고 chunk를 나누고 프롬프트 안에서 번호를 붙인다.
     chunks = [
         _escape_reference_delimiters(chunk.strip())
         for chunk in REFERENCE_CHUNK_SPLIT_PATTERN.split(safe_references)
