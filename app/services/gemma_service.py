@@ -118,15 +118,19 @@ def load_prompt_template(prompt_path: str = PROMPT_PATH) -> str:
     return read_prompt_template(prompt_path)
 
 
-def build_prompt(user_prompt: str | None = None) -> str:
-    return render_prompt(PROMPT_PATH, user_prompt)
+def build_prompt(
+    user_prompt: str | None = None,
+    references: str | None = None,
+) -> str:
+    return render_prompt(PROMPT_PATH, user_prompt, references)
 
 
 def build_direct_prompt(
     user_prompt: str | None = None,
+    references: str | None = None,
     allowed_categories: tuple[str, ...] = ALLOWED_CATEGORIES,
 ) -> str:
-    draft_prompt = build_prompt(user_prompt)
+    draft_prompt = build_prompt(user_prompt, references)
     labels_block = "\n".join(f"- {label}" for label in allowed_categories)
     fallback_instruction = (
         '주요 카테고리에 맞지 않거나 애매하면 "기타"를 선택해라.'
@@ -213,9 +217,10 @@ def generate_blog_draft_from_bytes(
     image_bytes: bytes,
     filename: str,
     user_prompt: str | None = None,
+    references: str | None = None,
 ) -> str:
     image_data_uri = image_bytes_to_data_uri(image_bytes, filename)
-    prompt_text = build_prompt(user_prompt)
+    prompt_text = build_prompt(user_prompt, references)
 
     return generate_text_from_image_uri(
         llm=llm,
@@ -230,11 +235,13 @@ def generate_blog_draft_and_category_from_bytes(
     image_bytes: bytes,
     filename: str,
     user_prompt: str | None = None,
+    references: str | None = None,
     allowed_categories: tuple[str, ...] = ALLOWED_CATEGORIES,
 ) -> GemmaDirectResult:
     image_data_uri = image_bytes_to_data_uri(image_bytes, filename)
     prompt_text = build_direct_prompt(
         user_prompt=user_prompt,
+        references=references,
         allowed_categories=allowed_categories,
     )
     response = llm.create_chat_completion(

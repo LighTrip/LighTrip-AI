@@ -29,6 +29,7 @@ def generate_draft_and_classify(
     image_bytes: bytes,
     filename: str,
     user_prompt: Optional[str] = None,
+    references: Optional[str] = None,
     unknown_threshold: Optional[float] = None,
 ) -> BlogPipelineResult:
     direct_result = generate_blog_draft_and_category_from_bytes(
@@ -36,6 +37,7 @@ def generate_draft_and_classify(
         image_bytes=image_bytes,
         filename=filename,
         user_prompt=user_prompt,
+        references=references,
         allowed_categories=ALLOWED_CATEGORIES,
     )
 
