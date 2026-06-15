@@ -32,6 +32,7 @@ class PipelineResponse(BaseModel):
 async def generate(
     image: Annotated[UploadFile, File()],
     text: Annotated[str, Form()] = "",
+    references: Annotated[str, Form()] = "",
 ):
     llm = get_llm()
     if llm is None or not is_model_loaded():
@@ -55,6 +56,7 @@ async def generate(
             image_bytes=image_bytes,
             filename=image.filename or "upload.jpg",
             user_prompt=text,
+            references=references,
         )
         logger.info("Pipeline inference completed")
         return {

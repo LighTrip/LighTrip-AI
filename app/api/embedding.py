@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import List
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -17,12 +18,12 @@ logger = logging.getLogger(__name__)
 
 
 class EmbedRequest(BaseModel):
-    texts: list[str] = Field(..., min_length=1)
+    texts: List[str] = Field(..., min_length=1)
 
 
 class EmbedResponse(BaseModel):
     dim: int
-    embeddings: list[list[float]]
+    embeddings: List[List[float]]
 
 
 @router.post("/get-embedding", response_model=EmbedResponse)
