@@ -1,3 +1,5 @@
+"""텍스트 embedding 전용 Llama 인스턴스와 벡터 후처리를 관리한다."""
+
 from __future__ import annotations
 
 from typing import Final, Optional

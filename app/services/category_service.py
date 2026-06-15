@@ -1,3 +1,5 @@
+"""카테고리 fallback 분류 모델 로딩과 추론을 담당하는 서비스."""
+
 from __future__ import annotations
 
 import os
@@ -34,6 +36,7 @@ CATEGORY_UNKNOWN_THRESHOLD: Final[Optional[float]] = optional_float_env(
     "CATEGORY_UNKNOWN_THRESHOLD"
 )
 
+# artifact와 pipeline은 앱 lifespan에서 한 번 로드한 뒤 요청 간 재사용한다.
 _artifact: Optional[Dict[str, Any]] = None
 _pipeline: Optional[Any] = None
 _metadata: Dict[str, Any] = {}
@@ -95,6 +98,7 @@ def load_category_model(artifact_path: Union[Path, str] = CATEGORY_ARTIFACT_PATH
 
 
 def _probability_scores(pipeline: Any, text: str) -> Optional[Dict[str, float]]:
+    # calibrated artifact만 predict_proba를 제공하므로 없는 경우 confidence를 생략한다.
     if not hasattr(pipeline, "predict_proba"):
         return None
     if not hasattr(pipeline, "classes_"):
@@ -109,6 +113,7 @@ def _probability_scores(pipeline: Any, text: str) -> Optional[Dict[str, float]]:
 
 
 def _decision_scores(pipeline: Any, text: str) -> Optional[Dict[str, float]]:
+    # 일반 LinearSVC 계열은 probability 대신 decision_function 점수를 제공한다.
     if not hasattr(pipeline, "decision_function"):
         return None
     if not hasattr(pipeline, "classes_"):
@@ -171,6 +176,7 @@ def classify_text(
     scores = decision_scores or probability_scores
     score = max(scores.values()) if scores else None
     threshold = _resolve_unknown_threshold(unknown_threshold)
+    # confidence가 낮으면 무리하게 기존 label을 고르지 않고 기타로 낮춘다.
     label = _apply_unknown_threshold(raw_label, confidence, threshold)
 
     return CategoryPrediction(

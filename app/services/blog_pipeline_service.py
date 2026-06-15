@@ -1,3 +1,5 @@
+"""Gemma Direct 결과와 SVM fallback을 조합하는 블로그 파이프라인 서비스."""
+
 from __future__ import annotations
 
 import logging
@@ -32,6 +34,7 @@ def generate_draft_and_classify(
     references: Optional[str] = None,
     unknown_threshold: Optional[float] = None,
 ) -> BlogPipelineResult:
+    # Gemma가 초안과 카테고리를 JSON으로 직접 반환하는 경로를 먼저 시도한다.
     direct_result = generate_blog_draft_and_category_from_bytes(
         llm=llm,
         image_bytes=image_bytes,
@@ -54,6 +57,7 @@ def generate_draft_and_classify(
     if not draft:
         raise ValueError("Gemma가 생성한 초안이 비어 있어 SVM fallback을 수행할 수 없습니다.")
 
+    # Gemma 카테고리가 누락/오류이면 생성된 초안을 기반으로 SVM fallback을 적용한다.
     svm_prediction = classify_text(
         text=draft,
         unknown_threshold=unknown_threshold,

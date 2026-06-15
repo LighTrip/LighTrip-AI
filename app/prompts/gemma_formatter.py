@@ -1,3 +1,5 @@
+"""Gemma vision 요청에 맞는 이미지 data URI와 message payload를 만든다."""
+
 from __future__ import annotations
 
 import base64
@@ -23,6 +25,7 @@ def image_file_to_data_uri(image_path: str) -> str:
 
 
 def build_vision_messages(image_data_uri: str, prompt_text: str) -> list[dict[str, Any]]:
+    # llama.cpp의 OpenAI 호환 chat completion 형식에 맞춰 이미지와 텍스트를 함께 보낸다.
     return [
         {
             "role": "user",

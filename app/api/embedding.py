@@ -1,3 +1,5 @@
+"""텍스트 embedding 벡터를 반환하는 FastAPI 라우터."""
+
 from __future__ import annotations
 
 import logging
@@ -33,6 +35,7 @@ async def embed(req: EmbedRequest):
         raise HTTPException(status_code=500, detail="임베딩 모델이 아직 로드되지 않았습니다.")
 
     try:
+        # 같은 요청 안의 여러 문장은 서비스 계층에서 한 번에 embedding한다.
         vectors = embed_texts(llm, req.texts)
     except Exception as exc:
         logger.exception("Embedding inference failed")

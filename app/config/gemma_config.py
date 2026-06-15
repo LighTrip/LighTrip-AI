@@ -1,3 +1,5 @@
+"""Gemma API 런타임 설정을 환경변수에서 읽어 구조화한다."""
+
 from __future__ import annotations
 
 import os
@@ -64,6 +66,7 @@ def required_path_env(name: str, project_root: Path = PROJECT_ROOT) -> str:
     path = Path(required_env(name))
     if path.is_absolute():
         return str(path)
+    # 로컬 실행 편의를 위해 상대경로는 프로젝트 루트 기준으로 해석한다.
     return str(project_root / path)
 
 
@@ -88,6 +91,7 @@ def required_list_env(name: str) -> list[str]:
 
 
 def load_gemma_config(project_root: Path = PROJECT_ROOT) -> GemmaConfig:
+    # 필수 환경변수를 import 시점에 검증해 서버가 반쯤 뜬 상태로 남지 않게 한다.
     return GemmaConfig(
         paths=GemmaPaths(
             model_path=required_path_env("GEMMA_MODEL_PATH", project_root),
