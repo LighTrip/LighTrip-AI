@@ -2,8 +2,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api.gemma import router as gemma_router
-
 from app.api.embedding import router as embedding_router
 from app.services.embedding_service import (
     is_embedding_model_loaded,
@@ -41,7 +39,6 @@ app = FastAPI(
 )
 
 app.include_router(pipeline_router)
-# app.include_router(gemma_router)
 app.include_router(embedding_router)    
 
 @app.get("/")
