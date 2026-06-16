@@ -1,6 +1,7 @@
 fastapi
 uvicorn
 python-multipart
+pydantic-settings
 llama-cpp-python
 scikit-learn
 joblib
