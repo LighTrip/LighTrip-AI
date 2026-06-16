@@ -5,9 +5,12 @@
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from starlette.responses import JSONResponse
 
 from app.api.embedding import router as embedding_router
+from app.config.settings import get_settings
+from app.security.api_key import is_auth_exempt_path, verify_api_key
 from app.services.embedding_service import (
     is_embedding_model_loaded,
     load_embedding_model,
@@ -23,6 +26,9 @@ from app.services.category_service import (
 )
 
 from app.services.gemma_service import load_model, unload_model, is_model_loaded
+
+
+settings = get_settings()
 
 
 @asynccontextmanager
@@ -43,10 +49,25 @@ app = FastAPI(
     description="이미지 기반 블로그 초안 및 카테고리 생성 API",
     version="1.0.0",
     lifespan=lifespan,
+    docs_url="/docs" if settings.enable_api_docs else None,
+    redoc_url="/redoc" if settings.enable_api_docs else None,
+    openapi_url="/openapi.json" if settings.enable_api_docs else None,
 )
 
 app.include_router(pipeline_router)
-app.include_router(embedding_router)    
+app.include_router(embedding_router)
+
+
+@app.middleware("http")
+async def require_internal_api_key(request: Request, call_next):
+    if is_auth_exempt_path(request.url.path):
+        return await call_next(request)
+
+    if not verify_api_key(request):
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+
+    return await call_next(request)
+
 
 @app.get("/")
 async def root():
