@@ -10,7 +10,10 @@ from llama_cpp import Llama
 
 from app.services.category_service import CategoryPrediction, classify_text
 from app.services.category_policy import ALLOWED_CATEGORIES, category_fallback_reason
-from app.services.gemma_service import generate_blog_draft_and_category_from_bytes
+from app.services.gemma_service import (
+    generate_blog_draft_and_category_from_bytes,
+    normalize_draft_text,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -45,15 +48,15 @@ def generate_draft_and_classify(
     )
 
     fallback_reason = category_fallback_reason(direct_result.raw_category)
+    draft = normalize_draft_text(direct_result.draft)
     if fallback_reason is None and direct_result.category is not None:
         return BlogPipelineResult(
-            draft=direct_result.draft,
+            draft=draft,
             category=direct_result.category,
             category_source="gemma_direct",
             gemma_category=direct_result.category,
         )
 
-    draft = direct_result.draft.strip()
     if not draft:
         raise ValueError("Gemma가 생성한 초안이 비어 있어 SVM fallback을 수행할 수 없습니다.")
 
