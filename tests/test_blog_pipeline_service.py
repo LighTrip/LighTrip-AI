@@ -33,19 +33,25 @@ class BlogPipelineServiceTest(unittest.TestCase):
         configure_required_env()
         from app.services import blog_pipeline_service as service
         from app.services.category_service import CategoryPrediction
-        from app.services.gemma_service import GemmaDirectResult, parse_direct_output
+        from app.services.gemma_service import (
+            GemmaDirectResult,
+            normalize_draft_text,
+            parse_direct_output,
+        )
 
         cls.service = service
         cls.CategoryPrediction = CategoryPrediction
         cls.GemmaDirectResult = GemmaDirectResult
         cls.parse_direct_output = staticmethod(parse_direct_output)
+        cls.normalize_draft_text = staticmethod(normalize_draft_text)
 
-    def test_direct_parser_preserves_empty_category_for_fallback(self) -> None:
+    def test_direct_parser_normalizes_newline_draft_for_fallback(self) -> None:
         result = self.parse_direct_output(
             '{"draft":"테이블에 앉아 잠깐 쉬었다.\\n오늘 기록으로 남겨두고 싶다.","category":""}'
         )
 
-        self.assertEqual(result.draft, "테이블에 앉아 잠깐 쉬었다.\n오늘 기록으로 남겨두고 싶다.")
+        self.assertEqual(result.draft, "테이블에 앉아 잠깐 쉬었다. 오늘 기록으로 남겨두고 싶다.")
+        self.assertNotIn("\n", result.draft)
         self.assertIsNone(result.category)
         self.assertEqual(result.raw_category, "")
 
@@ -56,6 +62,21 @@ class BlogPipelineServiceTest(unittest.TestCase):
 
         self.assertIsNone(result.category)
         self.assertEqual(result.raw_category, "여행")
+
+    def test_direct_parser_limits_draft_to_80_chars(self) -> None:
+        long_draft = (
+            "전시장을 천천히 둘러보다 마음에 남는 작품 앞에 오래 섰다. "
+            "조용한 조명 덕분에 오늘 본 색감이 더 선명하게 남았다. "
+            "집에 가서도 계속 떠오를 것 같다."
+        )
+
+        result = self.parse_direct_output(
+            '{"draft":"' + long_draft + '","category":"문화"}'
+        )
+
+        self.assertLessEqual(len(result.draft), 80)
+        self.assertNotIn("\n", result.draft)
+        self.assertEqual(result.category, "문화")
 
     def test_uses_gemma_category_when_valid(self) -> None:
         direct_result = self.GemmaDirectResult(
@@ -77,7 +98,9 @@ class BlogPipelineServiceTest(unittest.TestCase):
                 filename="sample.jpg",
             )
 
-        self.assertEqual(result.draft, direct_result.draft)
+        self.assertEqual(result.draft, "커피 향이 좋아 잠깐 쉬어갔다. 창가 자리가 유난히 편했다.")
+        self.assertNotIn("\n", result.draft)
+        self.assertLessEqual(len(result.draft), 80)
         self.assertEqual(result.category, "카페")
         self.assertEqual(result.category_source, "gemma_direct")
         classify_text.assert_not_called()
@@ -113,8 +136,11 @@ class BlogPipelineServiceTest(unittest.TestCase):
         self.assertEqual(result.category, "공원")
         self.assertEqual(result.category_source, "svm_fallback")
         self.assertEqual(result.fallback_reason, "missing_category")
+        normalized_draft = self.normalize_draft_text(direct_result.draft)
+        self.assertEqual(result.draft, normalized_draft)
+        self.assertNotIn("\n", result.draft)
         classify_text.assert_called_once_with(
-            text=direct_result.draft,
+            text=normalized_draft,
             unknown_threshold=None,
         )
 

@@ -12,11 +12,19 @@ from app.config.settings import get_settings
 
 API_KEY_HEADER = "X-API-Key"
 AUTH_EXEMPT_PATHS = frozenset({"/", "/health"})
+DOCS_AUTH_EXEMPT_PATHS = frozenset({
+    "/docs",
+    "/docs/oauth2-redirect",
+    "/openapi.json",
+    "/redoc",
+})
 logger = logging.getLogger(__name__)
 
 
-def is_auth_exempt_path(path: str) -> bool:
-    return path in AUTH_EXEMPT_PATHS
+def is_auth_exempt_path(path: str, docs_enabled: bool = False) -> bool:
+    if path in AUTH_EXEMPT_PATHS:
+        return True
+    return docs_enabled and path in DOCS_AUTH_EXEMPT_PATHS
 
 
 def verify_api_key(request: Request) -> bool:

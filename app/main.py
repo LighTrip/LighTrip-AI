@@ -6,11 +6,17 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.openapi.utils import get_openapi
 from starlette.responses import JSONResponse
 
 from app.api.embedding import router as embedding_router
 from app.config.settings import get_settings
-from app.security.api_key import is_auth_exempt_path, verify_api_key
+from app.security.api_key import (
+    API_KEY_HEADER,
+    AUTH_EXEMPT_PATHS,
+    is_auth_exempt_path,
+    verify_api_key,
+)
 from app.services.embedding_service import (
     is_embedding_model_loaded,
     load_embedding_model,
@@ -58,9 +64,47 @@ app.include_router(pipeline_router)
 app.include_router(embedding_router)
 
 
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    security_schemes = openapi_schema.setdefault("components", {}).setdefault(
+        "securitySchemes",
+        {},
+    )
+    security_schemes["InternalApiKey"] = {
+        "type": "apiKey",
+        "in": "header",
+        "name": API_KEY_HEADER,
+    }
+
+    for route_path, methods in openapi_schema.get("paths", {}).items():
+        if route_path in AUTH_EXEMPT_PATHS:
+            continue
+        for operation in methods.values():
+            if isinstance(operation, dict):
+                operation.setdefault("security", [{"InternalApiKey": []}])
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+if settings.enable_api_docs:
+    app.openapi = custom_openapi
+
+
 @app.middleware("http")
 async def require_internal_api_key(request: Request, call_next):
-    if is_auth_exempt_path(request.url.path):
+    if is_auth_exempt_path(
+        request.url.path,
+        docs_enabled=settings.enable_api_docs,
+    ):
         return await call_next(request)
 
     if not verify_api_key(request):

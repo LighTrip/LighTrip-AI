@@ -60,6 +60,9 @@ ALLOWED_IMAGE_TYPES: Final[set[str]] = {
     "image/webp",
 }
 JSON_OBJECT_PATTERN: Final[re.Pattern[str]] = re.compile(r"\{.*\}", re.DOTALL)
+DRAFT_MAX_CHARS: Final[int] = 80
+DRAFT_WHITESPACE_PATTERN: Final[re.Pattern[str]] = re.compile(r"\s+")
+DRAFT_SENTENCE_ENDINGS: Final[tuple[str, ...]] = (".", "!", "?", "。", "！", "？")
 
 
 @dataclass(frozen=True)
@@ -78,6 +81,7 @@ __all__ = [
     "create_chat_handler",
     "create_llm",
     "dedupe_sentences",
+    "normalize_draft_text",
     "GemmaDirectResult",
     "generate_blog_draft_from_bytes",
     "generate_blog_draft_and_category_from_bytes",
@@ -146,13 +150,14 @@ def build_direct_prompt(
 {labels_block}
 
 - key는 "draft", "category" 두 개만 사용해라.
-- draft는 한국어 2줄이며 줄바꿈은 JSON 문자열 안에서 \\n으로 표현해라.
+- draft는 한국어 2문장, 한 줄, 전체 80자 이하로 작성해라.
+- draft 문자열 안에 줄바꿈, \\n, 빈 줄을 넣지 마라.
 - category는 위 목록 중 정확히 1개만 작성해라.
 - {fallback_instruction}
 - 설명, 마크다운 코드블록, 추가 문장은 출력하지 마라.
 
 예시:
-{{"draft":"한강 근처를 뛰고 나니 땀이 나도 이상하게 기분이 가벼웠다.\\n바람도 선선해서 오늘 러닝은 오래 기억에 남을 것 같다.","category":"운동"}}
+{{"draft":"한강 근처를 뛰고 나니 기분이 가벼웠다. 선선한 바람 덕분에 오래 기억날 러닝이다.","category":"운동"}}
 """.strip()
     return f"{draft_prompt}\n\n{direct_rules}"
 
@@ -187,6 +192,19 @@ def _first_present(payload: dict[str, object], *keys: str) -> object:
     return None
 
 
+def normalize_draft_text(text: str, max_chars: int = DRAFT_MAX_CHARS) -> str:
+    draft = DRAFT_WHITESPACE_PATTERN.sub(" ", text).strip()
+    if len(draft) <= max_chars:
+        return draft
+
+    trimmed = draft[:max_chars].rstrip()
+    last_sentence_end = max(trimmed.rfind(ending) for ending in DRAFT_SENTENCE_ENDINGS)
+    if last_sentence_end >= max_chars // 2:
+        return trimmed[: last_sentence_end + 1].rstrip()
+
+    return trimmed.rstrip(" ,，;；")
+
+
 def parse_direct_output(
     raw_output: str,
     allowed_categories: tuple[str, ...] = ALLOWED_CATEGORIES,
@@ -195,7 +213,7 @@ def parse_direct_output(
     if decoded is None:
         # JSON 파싱 실패 시에도 draft 후보는 남겨 SVM fallback이 사용할 수 있게 한다.
         return GemmaDirectResult(
-            draft=raw_output.strip(),
+            draft=normalize_draft_text(raw_output),
             category=None,
             raw_category=None,
             raw_output=raw_output,
@@ -203,7 +221,8 @@ def parse_direct_output(
         )
 
     draft_value = _first_present(decoded, "draft", "초안", "generated_text")
-    draft = str(draft_value).strip() if isinstance(draft_value, str) else raw_output.strip()
+    raw_draft = str(draft_value).strip() if isinstance(draft_value, str) else raw_output.strip()
+    draft = normalize_draft_text(raw_draft)
     raw_category = _first_present(decoded, "category", "카테고리", "label")
     normalized_category = normalize_category(raw_category)
     category = normalized_category if normalized_category in set(allowed_categories) else None

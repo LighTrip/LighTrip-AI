@@ -35,13 +35,14 @@ REQUIRED_ENV = {
 }
 
 
-def configure_required_env(monkeypatch) -> None:
+def configure_required_env(monkeypatch, enable_api_docs: bool = False) -> None:
     for name, value in REQUIRED_ENV.items():
         monkeypatch.setenv(name, value)
+    monkeypatch.setenv("ENABLE_API_DOCS", "true" if enable_api_docs else "false")
 
 
-def load_test_app(monkeypatch):
-    configure_required_env(monkeypatch)
+def load_test_app(monkeypatch, enable_api_docs: bool = False):
+    configure_required_env(monkeypatch, enable_api_docs)
 
     from app.config.settings import get_settings
 
@@ -166,3 +167,30 @@ def test_fastapi_docs_are_disabled(monkeypatch) -> None:
     assert request(app, "GET", "/docs", headers=headers)[0] == 404
     assert request(app, "GET", "/redoc", headers=headers)[0] == 404
     assert request(app, "GET", "/openapi.json", headers=headers)[0] == 404
+
+
+def test_docs_are_public_when_enabled_for_local_debug(monkeypatch) -> None:
+    app = load_test_app(monkeypatch, enable_api_docs=True)
+
+    assert request(app, "GET", "/docs")[0] == 200
+    assert request(app, "GET", "/redoc")[0] == 200
+    assert request(app, "GET", "/openapi.json")[0] == 200
+    assert request(app, "POST", PIPELINE_GENERATE_PATH)[0] == 401
+
+
+def test_openapi_declares_api_key_for_protected_routes(monkeypatch) -> None:
+    app = load_test_app(monkeypatch, enable_api_docs=True)
+
+    status_code, body = request(app, "GET", "/openapi.json")
+    schema = json.loads(body)
+
+    assert status_code == 200
+    assert schema["components"]["securitySchemes"]["InternalApiKey"] == {
+        "type": "apiKey",
+        "in": "header",
+        "name": API_KEY_HEADER,
+    }
+    assert schema["paths"][PIPELINE_GENERATE_PATH]["post"]["security"] == [
+        {"InternalApiKey": []}
+    ]
+    assert "security" not in schema["paths"]["/health"]["get"]
