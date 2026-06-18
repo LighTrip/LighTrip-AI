@@ -26,7 +26,7 @@ def dedupe_sentences(text: str) -> str:
             seen.add(sentence)
             kept.append(sentence)
 
-    return "\n".join(kept)
+    return " ".join(kept)
 
 
 def load_prompt_template(prompt_path: str) -> str:
